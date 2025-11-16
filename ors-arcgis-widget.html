@@ -526,10 +526,17 @@
           title: "わたしの地域医療・防災マップ"
         }
       });
+      // Print を Epand でアイコン化
+      const printExpand = new Expand({
+        view: view,
+        content: print,
+        expanded: false,
+        expandTooltip: "印刷"
+      });
       view.when(() => {
-        view.ui.add(print, {
+        view.ui.add(printExpand, {
           position: "top-left",
-          index: 1
+          index: 2
         });
       });
 
@@ -540,7 +547,7 @@
       const legendExpand = new Expand({
         view: view,
         content: legend,
-        expanded: false,
+        expanded: true,
         expandTooltip: "凡例"
       });
 
@@ -560,4 +567,5 @@
   </script>
 </body>
 </html>
+
 
