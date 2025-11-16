@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <title>防災マップ用 ORS ルート検索</title>
+  <title>防災マップ（ルート検索＋描画＋印刷）</title>
 
   <!-- ArcGIS Maps SDK for JavaScript -->
   <link
@@ -10,6 +10,8 @@
     href="https://js.arcgis.com/4.30/esri/themes/light/main.css"
   />
   <script src="https://js.arcgis.com/4.30/"></script>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <style>
     html, body {
@@ -78,14 +80,95 @@
       cursor: pointer;
       font-size: 12px;
     }
+
+    /* 免責事項モーダル */
+    #disclaimer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    #disclaimer-modal {
+      background: #ffffff;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80%;
+      overflow-y: auto;
+      border-radius: 8px;
+      padding: 16px 18px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      font-size: 14px;
+    }
+    #disclaimer-modal h2 {
+      margin-top: 0;
+      font-size: 16px;
+    }
+    #disclaimer-modal p {
+      margin: 6px 0;
+      line-height: 1.6;
+    }
+    #disclaimer-modal .meta {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #555;
+    }
+    #disclaimer-button {
+      margin-top: 12px;
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 4px;
+      border: none;
+      background: #005ea5;
+      color: #ffffff;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    @media (max-width: 600px) {
+      #info {
+        font-size: 11px;
+      }
+      #disclaimer-modal {
+        padding: 12px 14px;
+      }
+    }
   </style>
 </head>
 
 <body>
+  <!-- 免責事項オーバーレイ -->
+  <div id="disclaimer-overlay">
+    <div id="disclaimer-modal">
+      <h2>免責事項 / Disclaimer</h2>
+      <p>
+        本アプリは、一般向けおよび教育用として、地図情報・避難所情報・ルート案内・危険箇所等の防災関連情報を提供するものです。
+        掲載内容は、公開データおよび作成時点の情報に基づいており、
+        その正確性・完全性・最新性を保証するものではありません。
+      </p>
+      <p>
+        災害時には道路状況、通行可否、避難所の開設状況、周辺環境などが急速に変化します。
+        本アプリの情報はあくまで参考としてご利用いただき、
+        実際の避難行動・安全確保は、必ず自治体等の公的情報および現地の状況を優先して判断してください。
+      </p>
+      <p>
+        本アプリの利用に関連して生じたいかなる損害・トラブルについても、
+        石川県立看護大学災害実践看護学講座 木田研究室（以下「本研究室」）は、一切の責任を負いかねます。
+      </p>
+      <div class="meta">
+        <div>運営者：石川県立看護大学災害実践看護学講座 木田研究室</div>
+        <div>バージョン：v0.2.2</div>
+      </div>
+      <button id="disclaimer-button">同意して利用する</button>
+    </div>
+  </div>
+
   <div id="app">
     <div id="info">
       <div id="info-left">
-        <b>ルート検索（OpenRouteService × ArcGIS Web マップ）</b><br />
+        <b>防災マップ：ルート検索 ＋ 描画 ＋ PDF出力</b><br />
         地図上をクリックして出発地・到着地を指定します。<br />
         ・1回目のクリック：出発地（緑） ／ 2回目：到着地（赤） → 自動でルート計算<br />
         ・3回目以降：リセットして新しい出発地を指定
@@ -107,15 +190,22 @@
   </div>
 
   <script>
-    // ★★★ 必ず自分の ORS APIキー と WebマップID に書き換えてください ★★★
-    const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjZiZTRmMmM5MDdkMjQ5NWU4MzAyZWZkNmZhYWYzMWMyIiwiaCI6Im11cm11cjY0In0=";      // ← あなたの ORS API キー
-    const WEBMAP_ID   = "a941c0ddd83d4d2994c388364ffe3558";        // ← 例: "99dec2e20e524d29a8aa564320a4fd03"
+    // ★★★ 必ず自分の ORS APIキー に書き換えてください ★★★
+    const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjZiZTRmMmM5MDdkMjQ5NWU4MzAyZWZkNmZhYWYzMWMyIiwiaCI6Im11cm11cjY0In0=";
 
-    // 現在の移動モード（ORS の profile）
-    // driving-car / foot-walking など
-    let currentProfile = "driving-car";
+    // あなたの Web マップ ID（例のURL：webmap=a941c0ddd83d4d2994c388364ffe3558）
+    const WEBMAP_ID   = "a941c0ddd83d4d2994c388364ffe3558";
 
-    // ArcGIS JS API を読み込む
+    // ORS の profile（移動モード）
+    let currentProfile = "driving-car"; // driving-car / foot-walking
+
+    // 免責事項モーダルを閉じる
+    document.getElementById("disclaimer-button").addEventListener("click", function () {
+      const overlay = document.getElementById("disclaimer-overlay");
+      overlay.style.display = "none";
+    });
+
+    // ArcGIS JS API
     require([
       "esri/WebMap",
       "esri/views/MapView",
@@ -123,7 +213,10 @@
       "esri/Graphic",
       "esri/geometry/support/webMercatorUtils",
       "esri/widgets/Sketch",
-      "esri/widgets/Print"
+      "esri/widgets/Print",
+      "esri/widgets/Legend",
+      "esri/widgets/LayerList",
+      "esri/widgets/Expand"
     ], function (
       WebMap,
       MapView,
@@ -131,9 +224,11 @@
       Graphic,
       webMercatorUtils,
       Sketch,
-      Print
+      Print,
+      Legend,
+      LayerList,
+      Expand
     ) {
-      // Web マップを読み込む（ここにあなたの防災マップが表示される）
       const webmap = new WebMap({
         portalItem: {
           id: WEBMAP_ID
@@ -145,9 +240,9 @@
         map: webmap
       });
 
-      // ルート・マーカー用の GraphicsLayer
+      // ルート・マーカー用レイヤ
       const routeLayer = new GraphicsLayer();
-      // スケッチ用の GraphicsLayer
+      // スケッチ用レイヤ
       const sketchLayer = new GraphicsLayer();
 
       webmap.addMany([routeLayer, sketchLayer]);
@@ -167,7 +262,6 @@
 
       function setMode(mode) {
         currentProfile = mode;
-        // ボタンの見た目を更新
         if (mode === "driving-car") {
           btnCar.classList.add("active");
           btnWalk.classList.remove("active");
@@ -175,7 +269,6 @@
           btnWalk.classList.add("active");
           btnCar.classList.remove("active");
         }
-        // 出発地と到着地があればルート再計算
         if (startGraphic && endGraphic) {
           requestRoute();
         }
@@ -189,7 +282,6 @@
         setMode("foot-walking");
       });
 
-      // ルート情報のリセット
       function resetRoute() {
         routeLayer.removeMany(
           [startGraphic, endGraphic, routeGraphic].filter(g => g)
@@ -204,11 +296,9 @@
         descentEl.textContent  = "–";
       }
 
-      // OpenRouteService にルートを問い合わせる
       async function requestRoute() {
         if (!startGraphic || !endGraphic) return;
 
-        // Webマップの座標系 → 経緯度（WGS84）に変換
         const startGeo = webMercatorUtils.webMercatorToGeographic(
           startGraphic.geometry
         );
@@ -248,14 +338,12 @@
         const props = feature.properties || {};
         const summary = props.summary || (props.segments && props.segments[0]) || {};
 
-        // 既存ルートを消す
         if (routeGraphic) {
           routeLayer.remove(routeGraphic);
           routeGraphic = null;
         }
 
-        // GeoJSON の [lon, lat] を WebMercator に変換して Polyline を作成
-        const coords = feature.geometry.coordinates; // [[lon, lat, z?], ...]
+        const coords = feature.geometry.coordinates;
         const paths = coords.map(function (c) {
           const lon = c[0];
           const lat = c[1];
@@ -279,11 +367,8 @@
         });
 
         routeLayer.add(routeGraphic);
-
-        // ルート全体が見えるように
         view.goTo(routeGraphic.geometry.extent.expand(1.3));
 
-        // サマリー情報の表示
         const distanceKm =
           summary.distance != null ? (summary.distance / 1000).toFixed(1) : "–";
         const durationMin =
@@ -299,12 +384,11 @@
         descentEl.textContent  = descent;
       }
 
-      // 地図クリックイベント：出発地・到着地の指定
+      // 地図クリック：出発地／到着地
       view.on("click", function (event) {
         const point = event.mapPoint;
 
         if (!startGraphic) {
-          // 1回目のクリック：出発地
           resetRoute();
           startGraphic = new Graphic({
             geometry: point,
@@ -320,7 +404,6 @@
           });
           routeLayer.add(startGraphic);
         } else if (!endGraphic) {
-          // 2回目のクリック：到着地 ＋ ルート計算
           endGraphic = new Graphic({
             geometry: point,
             symbol: {
@@ -336,7 +419,6 @@
           routeLayer.add(endGraphic);
           requestRoute();
         } else {
-          // 3回目以降：リセットして新しい出発地
           resetRoute();
           startGraphic = new Graphic({
             geometry: point,
@@ -374,7 +456,6 @@
               spatialReference: view.spatialReference
             };
 
-            // 出発地として設定
             resetRoute();
             startGraphic = new Graphic({
               geometry: point,
@@ -390,7 +471,6 @@
             });
             routeLayer.add(startGraphic);
 
-            // 現在地にズーム
             view.goTo({ target: point, zoom: 15 });
           },
           function (err) {
@@ -400,29 +480,50 @@
         );
       });
 
-      // Sketch ウィジェット（フリーハンド・図形・テキストなど）
+      // Sketch ウィジェット
       const sketch = new Sketch({
         view: view,
         layer: sketchLayer,
         availableCreateTools: ["point", "polyline", "polygon", "rectangle", "circle", "text"],
         creationMode: "update"
       });
-      // 右上に配置
       view.ui.add(sketch, "top-right");
 
-      // Print ウィジェット（PDF出力等）
+      // Print ウィジェット
       const print = new Print({
-        view: view,
+        view: view
       });
-      // 左上に配置（ズームボタンの下あたり）
       view.when(() => {
         view.ui.add(print, {
           position: "top-left",
           index: 1
         });
       });
+
+      // 凡例 & レイヤーリスト（Expand で畳めるように）
+      const legend = new Legend({
+        view: view
+      });
+      const legendExpand = new Expand({
+        view: view,
+        content: legend,
+        expanded: false,
+        expandTooltip: "凡例"
+      });
+
+      const layerList = new LayerList({
+        view: view
+      });
+      const layerListExpand = new Expand({
+        view: view,
+        content: layerList,
+        expanded: false,
+        expandTooltip: "レイヤー"
+      });
+
+      view.ui.add(legendExpand, "bottom-left");
+      view.ui.add(layerListExpand, "top-left");
     });
   </script>
 </body>
 </html>
-
