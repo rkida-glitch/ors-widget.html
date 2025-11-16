@@ -30,7 +30,8 @@
       padding: 6px 10px;
       font-size: 12px;
       border-bottom: 1px solid #ccc;
-      background: #f7f7f7;
+      background: #191970;
+      color: #ffffff;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
@@ -127,6 +128,30 @@
       font-size: 14px;
     }
 
+    .header-title {
+      font-size: 18pt;        /* ← ご指定どおり 18pt */
+      font-weight: 600;
+    }
+
+    .header-sub {
+      font-size: 11px;
+      opacity: 0.9;
+      margin-top: 2px;
+    }
+
+    .header-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-icon {
+      width: 32px;            /* アイコンサイズはお好みで調整 */
+      height: 32px;
+      object-fit: contain;
+    }
+
+
     @media (max-width: 600px) {
       #info {
         font-size: 11px;
@@ -168,10 +193,15 @@
   <div id="app">
     <div id="info">
       <div id="info-left">
-        <b>防災マップ：ルート検索 ＋ 描画 ＋ PDF出力</b><br />
-        地図上をクリックして出発地・到着地を指定します。<br />
-        ・1回目のクリック：出発地（緑） ／ 2回目：到着地（赤） → 自動でルート計算<br />
-        ・3回目以降：リセットして新しい出発地を指定
+        <div class="header-row">
+          <img src="icon.png" alt="ロゴ" class="header-icon" />
+          <span class="header-title">石川県地域医療・防災マップ（v0.2.2）</span>
+        </div>
+        <div class="header-sub">
+          地図上をクリックして出発地・到着地を指定します。<br />
+          ・1回目のクリック：出発地（緑） ／ 2回目：到着地（赤） → 自動でルート計算<br />
+          ・3回目以降：リセットして新しい出発地を指定
+        </div>
       </div>
       <div id="controls">
         <span>移動手段:</span>
@@ -491,7 +521,10 @@
 
       // Print ウィジェット
       const print = new Print({
-        view: view
+        view: view,
+        templateOptions: {
+          title: "わたしの地域医療・防災マップ"
+        }
       });
       view.when(() => {
         view.ui.add(print, {
@@ -527,3 +560,4 @@
   </script>
 </body>
 </html>
+
