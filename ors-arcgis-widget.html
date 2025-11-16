@@ -29,12 +29,26 @@
       font-size: 12px;
       border-bottom: 1px solid #ccc;
       background: #f7f7f7;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
     }
-    #info b {
-      font-size: 13px;
+    #info-left {
+      flex: 1 1 auto;
+      min-width: 220px;
+    }
+    #controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
     }
     #stats {
+      width: 100%;
       margin-top: 4px;
+      font-size: 12px;
     }
     .value {
       font-weight: bold;
@@ -43,22 +57,50 @@
       flex: 1;
       width: 100%;
     }
+    .mode-button {
+      padding: 2px 8px;
+      border: 1px solid #888;
+      border-radius: 4px;
+      background: #ffffff;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .mode-button.active {
+      background: #005ea5;
+      color: #ffffff;
+      border-color: #005ea5;
+    }
+    .small-button {
+      padding: 2px 8px;
+      border: 1px solid #888;
+      border-radius: 4px;
+      background: #ffffff;
+      cursor: pointer;
+      font-size: 12px;
+    }
   </style>
 </head>
 
 <body>
   <div id="app">
     <div id="info">
-      <b>ルート検索（OpenRouteService × ArcGIS Web マップ）</b><br />
-      地図上をクリックして出発地・到着地を指定します。<br />
-      ・1回目のクリック：出発地（緑）<br />
-      ・2回目のクリック：到着地（赤） → 自動でルート計算<br />
-      ・3回目以降のクリック：リセットして新しい出発地を指定<br />
-      <div id="stats">
-        距離: <span id="distance" class="value">–</span> km ／
-        時間: <span id="duration" class="value">–</span> 分 ／
-        上り: <span id="ascent" class="value">–</span> m ／
-        下り: <span id="descent" class="value">–</span> m
+      <div id="info-left">
+        <b>ルート検索（OpenRouteService × ArcGIS Web マップ）</b><br />
+        地図上をクリックして出発地・到着地を指定します。<br />
+        ・1回目のクリック：出発地（緑） ／ 2回目：到着地（赤） → 自動でルート計算<br />
+        ・3回目以降：リセットして新しい出発地を指定
+      </div>
+      <div id="controls">
+        <span>移動手段:</span>
+        <button id="btn-car" class="mode-button active">車</button>
+        <button id="btn-walk" class="mode-button">徒歩</button>
+        <button id="btn-current" class="small-button">現在地を出発地に</button>
+        <div id="stats">
+          距離: <span id="distance" class="value">–</span> km ／
+          時間: <span id="duration" class="value">–</span> 分 ／
+          上り: <span id="ascent" class="value">–</span> m ／
+          下り: <span id="descent" class="value">–</span> m
+        </div>
       </div>
     </div>
     <div id="viewDiv"></div>
@@ -66,8 +108,12 @@
 
   <script>
     // ★★★ 必ず自分の ORS APIキー と WebマップID に書き換えてください ★★★
-    const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjZiZTRmMmM5MDdkMjQ5NWU4MzAyZWZkNmZhYWYzMWMyIiwiaCI6Im11cm11cjY0In0=";
-    const WEBMAP_ID   = "a941c0ddd83d4d2994c388364ffe3558";  // 例: "99dec2e20e524d29a8aa564320a4fd03"
+    const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjZiZTRmMmM5MDdkMjQ5NWU4MzAyZWZkNmZhYWYzMWMyIiwiaCI6Im11cm11cjY0In0=";      // ← あなたの ORS API キー
+    const WEBMAP_ID   = "a941c0ddd83d4d2994c388364ffe3558";        // ← 例: "99dec2e20e524d29a8aa564320a4fd03"
+
+    // 現在の移動モード（ORS の profile）
+    // driving-car / foot-walking など
+    let currentProfile = "driving-car";
 
     // ArcGIS JS API を読み込む
     require([
@@ -75,8 +121,18 @@
       "esri/views/MapView",
       "esri/layers/GraphicsLayer",
       "esri/Graphic",
-      "esri/geometry/support/webMercatorUtils"
-    ], function (WebMap, MapView, GraphicsLayer, Graphic, webMercatorUtils) {
+      "esri/geometry/support/webMercatorUtils",
+      "esri/widgets/Sketch",
+      "esri/widgets/Print"
+    ], function (
+      WebMap,
+      MapView,
+      GraphicsLayer,
+      Graphic,
+      webMercatorUtils,
+      Sketch,
+      Print
+    ) {
       // Web マップを読み込む（ここにあなたの防災マップが表示される）
       const webmap = new WebMap({
         portalItem: {
@@ -89,9 +145,12 @@
         map: webmap
       });
 
-      // ルート・マーカーを描くための GraphicsLayer
-      const graphicsLayer = new GraphicsLayer();
-      webmap.add(graphicsLayer);
+      // ルート・マーカー用の GraphicsLayer
+      const routeLayer = new GraphicsLayer();
+      // スケッチ用の GraphicsLayer
+      const sketchLayer = new GraphicsLayer();
+
+      webmap.addMany([routeLayer, sketchLayer]);
 
       let startGraphic = null;
       let endGraphic = null;
@@ -102,8 +161,37 @@
       const ascentEl   = document.getElementById("ascent");
       const descentEl  = document.getElementById("descent");
 
+      const btnCar     = document.getElementById("btn-car");
+      const btnWalk    = document.getElementById("btn-walk");
+      const btnCurrent = document.getElementById("btn-current");
+
+      function setMode(mode) {
+        currentProfile = mode;
+        // ボタンの見た目を更新
+        if (mode === "driving-car") {
+          btnCar.classList.add("active");
+          btnWalk.classList.remove("active");
+        } else {
+          btnWalk.classList.add("active");
+          btnCar.classList.remove("active");
+        }
+        // 出発地と到着地があればルート再計算
+        if (startGraphic && endGraphic) {
+          requestRoute();
+        }
+      }
+
+      btnCar.addEventListener("click", function () {
+        setMode("driving-car");
+      });
+
+      btnWalk.addEventListener("click", function () {
+        setMode("foot-walking");
+      });
+
+      // ルート情報のリセット
       function resetRoute() {
-        graphicsLayer.removeMany(
+        routeLayer.removeMany(
           [startGraphic, endGraphic, routeGraphic].filter(g => g)
         );
         startGraphic = null;
@@ -116,10 +204,11 @@
         descentEl.textContent  = "–";
       }
 
+      // OpenRouteService にルートを問い合わせる
       async function requestRoute() {
         if (!startGraphic || !endGraphic) return;
 
-        // Webマップの座標系（多くは WebMercator） → 経緯度（WGS84）に変換
+        // Webマップの座標系 → 経緯度（WGS84）に変換
         const startGeo = webMercatorUtils.webMercatorToGeographic(
           startGraphic.geometry
         );
@@ -127,7 +216,10 @@
           endGraphic.geometry
         );
 
-        const url = "https://api.openrouteservice.org/v2/directions/driving-car/geojson";
+        const url =
+          "https://api.openrouteservice.org/v2/directions/" +
+          encodeURIComponent(currentProfile) +
+          "/geojson";
 
         const body = {
           coordinates: [
@@ -158,11 +250,11 @@
 
         // 既存ルートを消す
         if (routeGraphic) {
-          graphicsLayer.remove(routeGraphic);
+          routeLayer.remove(routeGraphic);
           routeGraphic = null;
         }
 
-        // GeoJSON の座標 [lon, lat] を WebMercator に変換して Polyline を作成
+        // GeoJSON の [lon, lat] を WebMercator に変換して Polyline を作成
         const coords = feature.geometry.coordinates; // [[lon, lat, z?], ...]
         const paths = coords.map(function (c) {
           const lon = c[0];
@@ -186,7 +278,7 @@
           }
         });
 
-        graphicsLayer.add(routeGraphic);
+        routeLayer.add(routeGraphic);
 
         // ルート全体が見えるように
         view.goTo(routeGraphic.geometry.extent.expand(1.3));
@@ -207,7 +299,7 @@
         descentEl.textContent  = descent;
       }
 
-      // 地図クリックイベント
+      // 地図クリックイベント：出発地・到着地の指定
       view.on("click", function (event) {
         const point = event.mapPoint;
 
@@ -226,7 +318,7 @@
               }
             }
           });
-          graphicsLayer.add(startGraphic);
+          routeLayer.add(startGraphic);
         } else if (!endGraphic) {
           // 2回目のクリック：到着地 ＋ ルート計算
           endGraphic = new Graphic({
@@ -241,7 +333,7 @@
               }
             }
           });
-          graphicsLayer.add(endGraphic);
+          routeLayer.add(endGraphic);
           requestRoute();
         } else {
           // 3回目以降：リセットして新しい出発地
@@ -258,8 +350,78 @@
               }
             }
           });
-          graphicsLayer.add(startGraphic);
+          routeLayer.add(startGraphic);
         }
+      });
+
+      // 現在地ボタン
+      btnCurrent.addEventListener("click", function () {
+        if (!navigator.geolocation) {
+          alert("このブラウザは現在地取得に対応していません。");
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          function (pos) {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+
+            const xy = webMercatorUtils.lngLatToXY(lon, lat);
+            const point = {
+              type: "point",
+              x: xy[0],
+              y: xy[1],
+              spatialReference: view.spatialReference
+            };
+
+            // 出発地として設定
+            resetRoute();
+            startGraphic = new Graphic({
+              geometry: point,
+              symbol: {
+                type: "simple-marker",
+                color: "green",
+                size: 10,
+                outline: {
+                  color: "white",
+                  width: 1
+                }
+              }
+            });
+            routeLayer.add(startGraphic);
+
+            // 現在地にズーム
+            view.goTo({ target: point, zoom: 15 });
+          },
+          function (err) {
+            console.error(err);
+            alert("現在地を取得できませんでした。位置情報の許可設定をご確認ください。");
+          }
+        );
+      });
+
+      // Sketch ウィジェット（フリーハンド・図形・テキストなど）
+      const sketch = new Sketch({
+        view: view,
+        layer: sketchLayer,
+        availableCreateTools: ["point", "polyline", "polygon", "rectangle", "circle", "text"],
+        creationMode: "update"
+      });
+      // 右上に配置
+      view.ui.add(sketch, "top-right");
+
+      // Print ウィジェット（PDF出力等）
+      const print = new Print({
+        view: view,
+        printServiceUrl:
+          "https://utility.arcgisonline.com/ArcGIS/rest/services/Utilities/PrintingTools/GPServer/Export%20Web%20Map%20Task"
+      });
+      // 左上に配置（ズームボタンの下あたり）
+      view.when(() => {
+        view.ui.add(print, {
+          position: "top-left",
+          index: 1
+        });
       });
     });
   </script>
