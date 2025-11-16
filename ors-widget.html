@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>ORS ルート検索ウィジェット</title>
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+    }
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    #info {
+      padding: 6px 10px;
+      font-size: 12px;
+      border-bottom: 1px solid #ccc;
+      background: #f7f7f7;
+    }
+    #info b {
+      font-size: 13px;
+    }
+    #map {
+      flex: 1;
+    }
+    .value {
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <div id="info">
+      <b>ルート検索（ORS）</b><br />
+      地図をクリックして「出発地」と「到着地」を指定してください。<br />
+      1回目のクリック → 出発地、2回目のクリック → 到着地（自動でルート計算）<br />
+      距離・時間・上り / 下りの合計高低差を下に表示します。
+      <br /><br />
+      距離: <span id="distance" class="value">–</span> km /
+      時間: <span id="duration" class="value">–</span> 分 /
+      上り: <span id="ascent" class="value">–</span> m /
+      下り: <span id="descent" class="value">–</span> m
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // ★★★ ここに自分の ORS APIキーを入れてください ★★★
+    const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjZiZTRmMmM5MDdkMjQ5NWU4MzAyZWZkNmZhYWYzMWMyIiwiaCI6Im11cm11cjY0In0=";
+
+    // Ishikawa 周辺を初期表示（お好みで変更OK）
+    const initialCenter = [36.781,136.734];
+    const initialZoom = 10;
+
+    const map = L.map("map").setView(initialCenter, initialZoom);
+
+    // ベースマップ（OpenStreetMap）
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors",
+      maxZoom: 19,
+    }).addTo(map);
+
+    let startMarker = null;
+    let endMarker = null;
+    let routeLayer = null;
+
+    const distanceEl = document.getElementById("distance");
+    const durationEl = document.getElementById("duration");
+    const ascentEl = document.getElementById("ascent");
+    const descentEl = document.getElementById("descent");
+
+    function resetRoute() {
+      if (startMarker) {
+        map.removeLayer(startMarker);
+        startMarker = null;
+      }
+      if (endMarker) {
+        map.removeLayer(endMarker);
+        endMarker = null;
+      }
+      if (routeLayer) {
+        map.removeLayer(routeLayer);
+        routeLayer = null;
+      }
+      distanceEl.textContent = "–";
+      durationEl.textContent = "–";
+      ascentEl.textContent = "–";
+      descentEl.textContent = "–";
+    }
+
+    async function requestRoute(startLatLng, endLatLng) {
+      const url =
+        "https://api.openrouteservice.org/v2/directions/driving-car/geojson";
+
+      // ORS の座標は [lon, lat] 順なので注意
+      const body = {
+        coordinates: [
+          [startLatLng.lng, startLatLng.lat],
+          [endLatLng.lng, endLatLng.lat],
+        ],
+        elevation: true, // 高低差も計算
+      };
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: ORS_API_KEY,
+          "Content-Type": "application/json; charset=utf-8",
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        alert("ルート計算に失敗しました (HTTP " + res.status + ")");
+        return;
+      }
+
+      const json = await res.json();
+
+      // GeoJSON なのでそのまま Leaflet に渡してOK
+      const feature = json.features[0];
+      const props = feature.properties;
+      const summary = props.summary || props.segments?.[0] || {};
+
+      if (routeLayer) {
+        map.removeLayer(routeLayer);
+      }
+      routeLayer = L.geoJSON(feature, {
+        style: { weight: 4 },
+      }).addTo(map);
+
+      map.fitBounds(routeLayer.getBounds(), { padding: [20, 20] });
+
+      // 距離[m] → km、小数1桁
+      const distanceKm =
+        summary.distance != null ? (summary.distance / 1000).toFixed(1) : "–";
+      // 時間[秒] → 分、小数1桁
+      const durationMin =
+        summary.duration != null ? (summary.duration / 60).toFixed(1) : "–";
+      const ascent =
+        summary.ascent != null ? Math.round(summary.ascent) : "–";
+      const descent =
+        summary.descent != null ? Math.round(summary.descent) : "–";
+
+      distanceEl.textContent = distanceKm;
+      durationEl.textContent = durationMin;
+      ascentEl.textContent = ascent;
+      descentEl.textContent = descent;
+    }
+
+    // 地図クリックで出発地・到着地をセット
+    map.on("click", async (e) => {
+      if (!startMarker) {
+        resetRoute();
+        startMarker = L.marker(e.latlng, { draggable: true })
+          .addTo(map)
+          .bindPopup("出発地")
+          .openPopup();
+      } else if (!endMarker) {
+        endMarker = L.marker(e.latlng, { draggable: true })
+          .addTo(map)
+          .bindPopup("到着地")
+          .openPopup();
+
+        // 出発地と到着地がそろったらルート計算
+        await requestRoute(startMarker.getLatLng(), endMarker.getLatLng());
+
+        // マーカーをドラッグしたときに再計算
+        startMarker.on("dragend", () => {
+          requestRoute(startMarker.getLatLng(), endMarker.getLatLng());
+        });
+        endMarker.on("dragend", () => {
+          requestRoute(startMarker.getLatLng(), endMarker.getLatLng());
+        });
+      } else {
+        // 3回目以降のクリックでリセットして再指定
+        resetRoute();
+        startMarker = L.marker(e.latlng, { draggable: true })
+          .addTo(map)
+          .bindPopup("出発地")
+          .openPopup();
+      }
+    });
+  </script>
+</body>
+</html>
