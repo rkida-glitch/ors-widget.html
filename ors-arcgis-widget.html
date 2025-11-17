@@ -172,7 +172,17 @@
     @media (max-width: 600px) {
       #info {
         font-size: 11px;
+        padding: 4px 6px;
       }
+
+      .header-sub {
+        display: none;
+      }
+
+      #elevation-panel {
+        display: none;
+      }
+    
       #disclaimer-modal {
         padding: 12px 14px;
       }
@@ -632,7 +642,9 @@
         content: searchWidget,
         expanded: false,
         expandTooltip: "場所を検索",
-        icon: "esri-icon-search"
+        icon: "esri-icon-search",
+        group: "top-right-tools",
+        autoCollapse: true
       });
       view.ui.add(searchExpand, "top-right");
       
@@ -648,7 +660,9 @@
         content: sketch,
         expanded: false,
         expandTooltip: "描画ツール",
-        icon: "esri-icon-edit"
+        icon: "esri-icon-edit",
+        group: "top-right-tools",
+        autoCollapse: true
       });
       view.ui.add(sketchExpand, "top-right");
 
@@ -663,7 +677,9 @@
         view: view,
         content: print,
         expanded: false,
-        expandTooltip: "印刷"
+        expandTooltip: "印刷",
+        group: "top-right-tools",
+        autoCollapse: true
       });
       view.when(function () {
         view.ui.add(printExpand, {
@@ -679,7 +695,9 @@
         content: legend,
         expanded: false,
         expandTooltip: "凡例",
-        icon: "esri-icon-layer-list"
+        icon: "esri-icon-layer-list",
+        group: "top-right-tools",
+        autoCollapse: true
       });
 
       const layerList = new LayerList({ view: view });
@@ -687,7 +705,9 @@
         view: view,
         content: layerList,
         expanded: false,
-        expandTooltip: "レイヤー"
+        expandTooltip: "レイヤー",
+        group: "top-right-tools",
+        autoCollapse: true
       });
 
       view.ui.add(legendExpand, "bottom-left");
@@ -696,6 +716,7 @@
   </script>
 </body>
 </html>
+
 
 
 
