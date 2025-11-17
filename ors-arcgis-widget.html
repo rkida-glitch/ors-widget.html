@@ -239,10 +239,10 @@
   </div>
 
   <script>
-    // ★ ORS APIキー（公開リポジトリなので、可能なら制限付きキーにしてください）
+    // ★ あなたの ORS APIキー を設定
     const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjZiZTRmMmM5MDdkMjQ5NWU4MzAyZWZkNmZhYWYzMWMyIiwiaCI6Im11cm11cjY0In0=";
 
-    // あなたの Web マップ ID
+    // Web マップ ID
     const WEBMAP_ID = "a941c0ddd83d4d2994c388364ffe3558";
 
     // ORS の profile（移動モード）
@@ -278,8 +278,6 @@
       LayerList,
       Expand
     ) {
-      let elevationChart = null;
-
       const webmap = new WebMap({
         portalItem: { id: WEBMAP_ID }
       });
@@ -289,9 +287,8 @@
         map: webmap
       });
 
-      // ルート・マーカー用レイヤ
+      // ルート・スケッチレイヤ
       const routeLayer = new GraphicsLayer();
-      // スケッチ用レイヤ
       const sketchLayer = new GraphicsLayer();
       webmap.addMany([routeLayer, sketchLayer]);
 
@@ -322,12 +319,22 @@
         }
       }
 
-      btnCar.addEventListener("click", () => setMode("driving-car"));
-      btnWalk.addEventListener("click", () => setMode("foot-walking"));
+      btnCar.addEventListener("click", function () { setMode("driving-car"); });
+      btnWalk.addEventListener("click", function () { setMode("foot-walking"); });
+
+      // 標高グラフを消去
+      function clearElevationChart() {
+        const canvas = document.getElementById("elevationChart");
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        const w = canvas.width  = canvas.clientWidth;
+        const h = canvas.height = canvas.clientHeight;
+        ctx.clearRect(0, 0, w, h);
+      }
 
       function resetRoute() {
         routeLayer.removeMany(
-          [startGraphic, endGraphic, routeGraphic].filter(g => g)
+          [startGraphic, endGraphic, routeGraphic].filter(function (g) { return g; })
         );
         startGraphic = null;
         endGraphic = null;
@@ -339,20 +346,9 @@
         descentEl.textContent  = "–";
 
         clearElevationChart();
-        }
       }
 
-      // 標高グラフを消去
-      function clearElevationChart() {
-        const canvas = document.getElementById("elevationChart");
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        const w = canvas.width = canvas.clientWidth;
-        const h = canvas.geight = canvas.clientHeight;
-        ctx.clearRect(0, 0, w, h);
-    }
-      
-      // 標高プロファイルの更新
+      // 標高プロファイル描画（シンプル版）
       function updateElevationChart(coords) {
         const canvas = document.getElementById("elevationChart");
         if (!canvas) return;
@@ -363,11 +359,10 @@
         }
 
         const ctx = canvas.getContext("2d");
-        const w = canvas.width = canvas.clientWidth;
+        const w = canvas.width  = canvas.clientWidth;
         const h = canvas.height = canvas.clientHeight;
-        etx.clearReact(0, 0, w, h);
+        ctx.clearRect(0, 0, w, h);
 
-        // 距離・標高配列を作成
         const distances = [0];
         const elevations = [];
 
@@ -375,9 +370,8 @@
         const z0 = first.length > 2 ? first[2] : 0;
         elevations.push(z0);
 
-        let totalDist = 0;
-
-        for (let i = 1; i < coords.length; i++) {
+        var totalDist = 0;
+        for (var i = 1; i < coords.length; i++) {
           const prev = coords[i - 1];
           const curr = coords[i];
 
@@ -388,7 +382,7 @@
           const xy2 = webMercatorUtils.lngLatToXY(lon2, lat2);
           const dx = xy2[0] - xy1[0];
           const dy = xy2[1] - xy1[1];
-          const segDist = Math.sqrt(dx * dx + dy * dy); // m
+          const segDist = Math.sqrt(dx * dx + dy * dy);
 
           totalDist += segDist;
           distances.push(totalDist);
@@ -397,15 +391,14 @@
           elevations.push(z);
         }
 
-        // m→km & 標高レンジ
-        const distKm = distances.map(d => d / 1000);
+        const distKm = distances.map(function (d) { return d / 1000; });
         const minElev = Math.min.apply(null, elevations);
         const maxElev = Math.max.apply(null, elevations);
-        const pad = (maxElev - minElev) * 0.2 || 10;
+        const pad = (maxElev - minElev) * 0.1 || 10;
         const yMin = minElev - pad;
         const yMax = maxElev + pad;
 
-        // 軸を描画（簡易）
+        // 軸
         ctx.strokeStyle = "#666";
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -414,19 +407,16 @@
         ctx.lineTo(w - 5, h - 15);
         ctx.stroke();
 
-        // プロファイル線
+        // 折れ線
         ctx.strokeStyle = "rgba(0,90,160,0.9)";
-        ctx.fillStyle   = "rgba(0,90,160,0.2)";
         ctx.lineWidth = 2;
         ctx.beginPath();
-
-        for (let i = 0; i < elevations.length; i++) {
-          const t = distKm[i] / distKm[distKm.length - 1] || 0;
+        for (var j = 0; j < elevations.length; j++) {
+          const t = distKm[j] / distKm[distKm.length - 1] || 0;
           const x = 30 + t * (w - 35);
-          const ratio = (elevations[i] - yMin) / (yMax - yMin || 1);
+          const ratio = (elevations[j] - yMin) / (yMax - yMin || 1);
           const y = (h - 15) - ratio * (h - 25);
-
-          if (i === 0) ctx.moveTo(x, y);
+          if (j === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }
         ctx.stroke();
@@ -482,7 +472,7 @@
         const coords = feature.geometry.coordinates;
         updateElevationChart(coords);
 
-        const paths = coords.map(c => {
+        const paths = coords.map(function (c) {
           const lon = c[0];
           const lat = c[1];
           const xy = webMercatorUtils.lngLatToXY(lon, lat);
@@ -628,7 +618,7 @@
         expanded: false,
         expandTooltip: "印刷"
       });
-      view.when(() => {
+      view.when(function () {
         view.ui.add(printExpand, {
           position: "top-left",
           index: 2
@@ -658,4 +648,3 @@
   </script>
 </body>
 </html>
-
