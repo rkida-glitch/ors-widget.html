@@ -271,6 +271,7 @@
       "esri/widgets/Legend",
       "esri/widgets/LayerList",
       "esri/widgets/Expand"
+      "esri/widgets/Search"
     ], function (
       WebMap,
       MapView,
@@ -281,7 +282,8 @@
       Print,
       Legend,
       LayerList,
-      Expand
+      Expand,
+      Search
     ) {
       const webmap = new WebMap({
         portalItem: { id: WEBMAP_ID }
@@ -611,6 +613,22 @@
         );
       });
 
+      // Search ヴィジット
+      const searchWidge = new Search({
+        view: view,
+        includeDefaultSources: true,
+        popupEnabled: true,
+        locationEnabled: true
+      });
+      const searchExpand = new Expand({
+        view: view,
+        content: searchWidget,
+        expanded: false,
+        expandedTooltip: "場所を検索",
+        icon: "esri-icon-search"
+      });
+      view.ui.add(searchExpand, "top-right");
+      
       // Sketch ウィジェット（Expand で折りたたみ）
       const sketch = new Sketch({
         view: view,
@@ -670,6 +688,7 @@
   </script>
 </body>
 </html>
+
 
 
 
