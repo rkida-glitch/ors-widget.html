@@ -186,6 +186,11 @@
       #disclaimer-modal {
         padding: 12px 14px;
       }
+
+      .esri-ui .esri-expand__content {
+        max-height: 60vh;
+        overflow-y: auto;
+      }
     }
   </style>
 </head>
@@ -706,6 +711,7 @@
         content: layerList,
         expanded: false,
         expandTooltip: "レイヤー",
+        icon: "esri-icon-table",
         group: "top-right-tools",
         autoCollapse: true
       });
@@ -716,6 +722,7 @@
   </script>
 </body>
 </html>
+
 
 
 
