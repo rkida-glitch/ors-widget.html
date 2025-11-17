@@ -147,6 +147,11 @@
       height: 32px;
       object-fit: contain;
     }
+    .elevation-stats {
+      font-size: 11px;
+      color: #555;
+      margin-top: 2px;
+    }
 
     /* 標高プロファイルパネル */
     #elevation-panel {
@@ -223,8 +228,6 @@
         <div id="stats">
           距離: <span id="distance" class="value">–</span> km ／
           時間: <span id="duration" class="value">–</span> 分 ／
-          上り: <span id="ascent" class="value">–</span> m ／
-          下り: <span id="descent" class="value">–</span> m
         </div>
       </div>
     </div>
@@ -233,8 +236,9 @@
     <div id="elevation-panel">
       <div id="elevation-title">ルートの高低差</div>
       <canvas id="elevationChart"></canvas>
+      <div id="elevation-stats" class="elevation-stats">
+        min: - m ／ max: - m
     </div>
-
     <div id="viewDiv"></div>
   </div>
 
@@ -346,6 +350,11 @@
         descentEl.textContent  = "–";
 
         clearElevationChart();
+        // ★ min / max 表示もリセット
+        const elevStatsEl = document.getElementById("elevation-stats");
+        if (elevStatsEl) {
+          elevStatsEl.textContent = "min: – m ／ max: – m";
+        }        
       }
 
       // 標高プロファイル描画（シンプル版）
@@ -397,6 +406,15 @@
         const pad = (maxElev - minElev) * 0.1 || 10;
         const yMin = minElev - pad;
         const yMax = maxElev + pad;
+
+        // ★ min / max を画面に表示（小数1桁で丸め）
+        const elevStatsEl = document.getElementById("elevation-stats");
+        if (elevStatsEl) {
+          const minDisp = Math.round(minElev * 10) / 10;
+          const maxDisp = Math.round(maxElev * 10) / 10;
+          elevStatsEl.textContent =
+            "min: " + minDisp + " m ／ max: " + maxDisp + " m";
+        }
 
         // 軸
         ctx.strokeStyle = "#666";
@@ -654,4 +672,5 @@
   </script>
 </body>
 </html>
+
 
