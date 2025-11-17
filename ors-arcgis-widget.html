@@ -11,9 +11,6 @@
   />
   <script src="https://js.arcgis.com/4.30/"></script>
 
-  <!-- Chart.js（標高プロファイル表示用） -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <style>
@@ -341,25 +338,36 @@
         ascentEl.textContent   = "–";
         descentEl.textContent  = "–";
 
-        if (elevationChart) {
-          elevationChart.destroy();
-          elevationChart = null;
+        clearElevationChart();
         }
       }
 
+      // 標高グラフを消去
+      function clearElevationChart() {
+        const canvas = document.getElementById("elevationChart");
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        const w = canvas.width = canvas.clientWidth;
+        const h = canvas.geight = canvas.clientHeight;
+        ctx.clearRect(0, 0, w, h);
+    }
+      
       // 標高プロファイルの更新
       function updateElevationChart(coords) {
         const canvas = document.getElementById("elevationChart");
         if (!canvas) return;
 
         if (!coords || coords.length === 0) {
-          if (elevationChart) {
-            elevationChart.destroy();
-            elevationChart = null;
-          }
+          clearElevationChart();
           return;
         }
 
+        const ctx = canvas.getContext("2d");
+        const w = canvas.width = canvas.clientWidth;
+        const h = canvas.height = canvas.clientHeight;
+        etx.clearReact(0, 0, w, h);
+
+        // 距離・標高配列を作成
         const distances = [0];
         const elevations = [];
 
@@ -380,7 +388,7 @@
           const xy2 = webMercatorUtils.lngLatToXY(lon2, lat2);
           const dx = xy2[0] - xy1[0];
           const dy = xy2[1] - xy1[1];
-          const segDist = Math.sqrt(dx * dx + dy * dy);
+          const segDist = Math.sqrt(dx * dx + dy * dy); // m
 
           totalDist += segDist;
           distances.push(totalDist);
@@ -389,55 +397,39 @@
           elevations.push(z);
         }
 
+        // m→km & 標高レンジ
         const distKm = distances.map(d => d / 1000);
-        const ctx = canvas.getContext("2d");
+        const minElev = Math.min.apply(null, elevations);
+        const maxElev = Math.max.apply(null, elevations);
+        const pad = (maxElev - minElev) * 0.2 || 10;
+        const yMin = minElev - pad;
+        const yMax = maxElev + pad;
 
-        if (elevationChart) {
-          elevationChart.destroy();
+        // 軸を描画（簡易）
+        ctx.strokeStyle = "#666";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(30, 5);
+        ctx.lineTo(30, h - 15);
+        ctx.lineTo(w - 5, h - 15);
+        ctx.stroke();
+
+        // プロファイル線
+        ctx.strokeStyle = "rgba(0,90,160,0.9)";
+        ctx.fillStyle   = "rgba(0,90,160,0.2)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+
+        for (let i = 0; i < elevations.length; i++) {
+          const t = distKm[i] / distKm[distKm.length - 1] || 0;
+          const x = 30 + t * (w - 35);
+          const ratio = (elevations[i] - yMin) / (yMax - yMin || 1);
+          const y = (h - 15) - ratio * (h - 25);
+
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
         }
-
-        elevationChart = new Chart(ctx, {
-          type: "line",
-          data: {
-            labels: distKm,
-            datasets: [
-              {
-                label: "標高 (m)",
-                data: elevations,
-                borderColor: "rgba(0, 90, 160, 0.9)",
-                backgroundColor: "rgba(0, 90, 160, 0.2)",
-                tension: 0.1,
-                pointRadius: 0
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              x: {
-                title: { display: true, text: "距離 (km)", font: { size: 10 } },
-                ticks: { maxTicksLimit: 6, font: { size: 9 } }
-              },
-              y: {
-                title: { display: true, text: "標高 (m)", font: { size: 10 } },
-                ticks: { font: { size: 9 } }
-              }
-            },
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                callbacks: {
-                  label: ctx => {
-                    const d = ctx.parsed.x.toFixed(2);
-                    const h = ctx.parsed.y.toFixed(0);
-                    return `${d} km, ${h} m`;
-                  }
-                }
-              }
-            }
-          }
-        });
+        ctx.stroke();
       }
 
       async function requestRoute() {
@@ -666,3 +658,4 @@
   </script>
 </body>
 </html>
+
