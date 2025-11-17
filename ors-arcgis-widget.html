@@ -197,8 +197,14 @@
 
       .esri-expand__content,
       .esri-expand__panel {
-        max-height: 35vh; !important;
-        overflow-y: auto; !important;
+        max-height: 35vh !important;
+        overflow-y: auto !important;
+      }
+
+      .esri-expand__content .esri-legend,
+      .esri-expand__content .esri-layer-list {
+        max-height: 40vh !important;
+        overflow-y:aut !important;
       }
     }
   </style>
@@ -746,7 +752,7 @@
         expanded: false,
         expandTooltip: "レイヤー",
         icon: "esri-icon-table",
-        group: "top-right-tools",
+        group: "left-tools",
         autoCollapse: true
       });
 
@@ -756,6 +762,7 @@
   </script>
 </body>
 </html>
+
 
 
 
