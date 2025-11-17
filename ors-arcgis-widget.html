@@ -603,8 +603,14 @@
         availableCreateTools: ["point", "polyline", "polygon", "rectangle", "circle", "text"],
         creationMode: "update"
       });
-      view.ui.add(sketch, "top-right");
-
+      const sketchExpand = new Expand({
+        view: view,
+        content: sketch,
+        expanded: false,
+        expandTooltip: "描画ツール"
+      });
+      view.ui.add(sketchExpand, "top-right")
+      
       // Print ウィジェット（Expand でアイコン化）
       const print = new Print({
         view: view,
@@ -648,3 +654,4 @@
   </script>
 </body>
 </html>
+
