@@ -336,6 +336,7 @@
       let startGraphic = null;
       let endGraphic = null;
       let routeGraphic = null;
+      let measurement = null;
 
       const distanceEl = document.getElementById("distance");
       const durationEl = document.getElementById("duration");
@@ -688,45 +689,49 @@
       });
       view.ui.add(sketchExpand, "top-right");
 
-      // 計測ヴィジェット
-      const measurement = new Measurement({
-        view: view,
-        activeTool: null,
-        linearUnit: "kilometers",
-        areaUnit: "square-kilometers"
-      });
-      const measurementExpand = new Expand({
-        view: view,
-        content: measurement,
-        expanded: false,
-        expandTooltip: "距離・面積を計算",
-        icon: "esri-icon-measure-line",
-        group: "top-right-tools",
-        autoCollapse: true
-      });
-      view.ui.add(measurementExpand, "top-right");
-
-      // Print ウィジェット（Expand でアイコン化）
-      const print = new Print({
-        view: view,
-        templateOptions: {
-          title: "わたしの地域医療・防災マップ"
-        }
-      });
-      const printExpand = new Expand({
-        view: view,
-        content: print,
-        expanded: false,
-        expandTooltip: "印刷",
-        group: "top-right-tools",
-        autoCollapse: true
-      });
+      // Measurement & Print ウィジェットは view が準備できてから追加
       view.when(function () {
+
+        // 計測ウィジェット
+        measurement = new Measurement({
+          view: view,
+          activeTool: null,
+          linearUnit: "kilometers",
+          areaUnit: "square-kilometers"
+        });
+
+        const measurementExpand = new Expand({
+          view: view,
+          content: measurement,
+          expanded: false,
+          expandTooltip: "距離・面積を計測",
+          icon: "esri-icon-measure-line",
+          group: "top-right-tools",
+          autoCollapse: true
+        });
+        view.ui.add(measurementExpand, "top-right");
+
+        // Print ウィジェット（Expand でアイコン化）
+        const print = new Print({
+          view: view,
+          templateOptions: {
+            title: "わたしの地域医療・防災マップ"
+          }
+        });
+        const printExpand = new Expand({
+          view: view,
+          content: print,
+          expanded: false,
+          expandTooltip: "印刷",
+          group: "top-right-tools",
+          autoCollapse: true
+        });
         view.ui.add(printExpand, {
           position: "top-left",
           index: 2
         });
       });
+
 
       // 凡例 & レイヤーリスト（Expand）
       const legend = new Legend({ view: view });
@@ -757,6 +762,7 @@
   </script>
 </body>
 </html>
+
 
 
 
