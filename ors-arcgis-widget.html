@@ -189,7 +189,7 @@
 
       .esri-expand__content,
       .esri-expand__panel {
-        max-height: 60vh; !important;
+        max-height: 50vh; !important;
         overflow-y: auto; !important;
       }
     }
@@ -294,7 +294,8 @@
       "esri/widgets/Legend",
       "esri/widgets/LayerList",
       "esri/widgets/Expand",
-      "esri/widgets/Search"
+      "esri/widgets/Search",
+      "esri/widgets/Measurement"
     ], function (
       WebMap,
       MapView,
@@ -306,7 +307,8 @@
       Legend,
       LayerList,
       Expand,
-      Search
+      Search,
+      Measurement
     ) {
       const webmap = new WebMap({
         portalItem: { id: WEBMAP_ID }
@@ -554,6 +556,11 @@
 
       // 地図クリック：出発地／到着地
       view.on("click", function (event) {
+
+        // 計測ツール動作中・ルート処理はスキップ
+        if (measurement && measurement.activeTool) {
+          return;
+        }
         const point = event.mapPoint;
 
         if (!startGraphic) {
@@ -672,6 +679,24 @@
       });
       view.ui.add(sketchExpand, "top-right");
 
+      // 計測ヴィジェット
+      const measurement = new Measurement({
+        view: view,
+        activeTool: null,
+        linearUnit: "kilometers",
+        areaUnit: "square-kilometers"
+      });
+      const measurementExpand = new Expand({
+        view: view,
+        content: measurement,
+        expanded: false,
+        expandTppltip: "距離・面積を計算",
+        icon: "esri-icon-measure-line",
+        group: "right-tools",
+        autoCollapse: true
+      });
+      view.ui.add(measurementExpand, "top-right");
+
       // Print ウィジェット（Expand でアイコン化）
       const print = new Print({
         view: view,
@@ -723,6 +748,7 @@
   </script>
 </body>
 </html>
+
 
 
 
