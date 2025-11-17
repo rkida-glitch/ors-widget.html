@@ -304,7 +304,7 @@
       "esri/widgets/LayerList",
       "esri/widgets/Expand",
       "esri/widgets/Search",
-      "esri/widgets/Measurement"
+      "esri/widgets/DistanceMeasurement2D"
     ], function (
       WebMap,
       MapView,
@@ -317,7 +317,7 @@
       LayerList,
       Expand,
       Search,
-      Measurement
+      DistanceMeasurement2D
     ) {
       const webmap = new WebMap({
         portalItem: { id: WEBMAP_ID }
@@ -336,7 +336,7 @@
       let startGraphic = null;
       let endGraphic = null;
       let routeGraphic = null;
-      let measurement = null;
+      let distanceMeasurement = null;
 
       const distanceEl = document.getElementById("distance");
       const durationEl = document.getElementById("duration");
@@ -568,7 +568,9 @@
       view.on("click", function (event) {
 
         // 計測ツール動作中・ルート処理はスキップ
-        if (measurement && measurement.activeTool) {
+        if (distanceMeasurement &&
+            distanceMeasurement.viewModel &&
+            distanceMeasurement.viewModel.state === "measuring") {
           return;
         }
         const point = event.mapPoint;
@@ -693,13 +695,14 @@
       view.when(function () {
 
         // 計測ウィジェット
-        measurement = new Measurement({
+        distanceMeasurement2D = new DistanceMeasurement2D({
           view: view,
+          unit: "kilometers"
         });
 
         const measurementExpand = new Expand({
           view: view,
-          content: measurement,
+          content: distanceMeasurement,
           expanded: false,
           expandTooltip: "距離・面積を計測",
           icon: "esri-icon-measure-line",
@@ -759,6 +762,7 @@
   </script>
 </body>
 </html>
+
 
 
 
