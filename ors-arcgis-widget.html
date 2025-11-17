@@ -181,6 +181,7 @@
 
       #elevationChart {
         height: 40px;
+      }
 
       #elevation-panel {
         padding: 2px 6px;
@@ -199,12 +200,6 @@
       .esri-expand__panel {
         max-height: 35vh !important;
         overflow-y: auto !important;
-      }
-
-      .esri-expand__content .esri-legend,
-      .esri-expand__content .esri-layer-list {
-        max-height: 40vh !important;
-        overflow-y:aut !important;
       }
     }
   </style>
@@ -704,9 +699,9 @@
         view: view,
         content: measurement,
         expanded: false,
-        expandTppltip: "距離・面積を計算",
+        expandTooltip: "距離・面積を計算",
         icon: "esri-icon-measure-line",
-        group: "right-tools",
+        group: "top-right-tools",
         autoCollapse: true
       });
       view.ui.add(measurementExpand, "top-right");
@@ -762,6 +757,7 @@
   </script>
 </body>
 </html>
+
 
 
 
