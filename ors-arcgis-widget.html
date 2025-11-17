@@ -276,306 +276,367 @@
     <div id="viewDiv"></div>
   </div>
 
-  <script>
-    // ★ あなたの ORS APIキー を設定
-    const ORS_PROXY_URL = "https://ors-route-proxy.r-kida-tky.workers.dev/";
-    // Web マップ ID
-    const WEBMAP_ID = "a941c0ddd83d4d2994c388364ffe3558";
+<script>
+  // ★ Cloudflare Worker の ORS プロキシURL
+  const ORS_PROXY_URL = "https://ors-route-proxy.r-kida-tky.workers.dev/";
+  // Web マップ ID
+  const WEBMAP_ID = "a941c0ddd83d4d2994c388364ffe3558";
 
-    // ORS の profile（移動モード）
-    let currentProfile = "driving-car"; // driving-car / foot-walking
+  // ORS の profile（移動モード）
+  let currentProfile = "driving-car"; // driving-car / foot-walking
 
-    // 免責事項モーダルを閉じる
-    document.getElementById("disclaimer-button").addEventListener("click", function () {
-      const overlay = document.getElementById("disclaimer-overlay");
-      overlay.style.display = "none";
+  // 免責事項モーダルを閉じる
+  document.getElementById("disclaimer-button").addEventListener("click", function () {
+    const overlay = document.getElementById("disclaimer-overlay");
+    overlay.style.display = "none";
+  });
+
+  // ArcGIS JS API
+  require([
+    "esri/WebMap",
+    "esri/views/MapView",
+    "esri/layers/GraphicsLayer",
+    "esri/Graphic",
+    "esri/geometry/support/webMercatorUtils",
+    "esri/widgets/Sketch",
+    "esri/widgets/Print",
+    "esri/widgets/Legend",
+    "esri/widgets/LayerList",
+    "esri/widgets/Expand",
+    "esri/widgets/Search",
+    "esri/widgets/DistanceMeasurement2D"
+  ], function (
+    WebMap,
+    MapView,
+    GraphicsLayer,
+    Graphic,
+    webMercatorUtils,
+    Sketch,
+    Print,
+    Legend,
+    LayerList,
+    Expand,
+    Search,
+    DistanceMeasurement2D
+  ) {
+
+    const webmap = new WebMap({
+      portalItem: { id: WEBMAP_ID }
     });
 
-    // ArcGIS JS API
-    require([
-      "esri/WebMap",
-      "esri/views/MapView",
-      "esri/layers/GraphicsLayer",
-      "esri/Graphic",
-      "esri/geometry/support/webMercatorUtils",
-      "esri/widgets/Sketch",
-      "esri/widgets/Print",
-      "esri/widgets/Legend",
-      "esri/widgets/LayerList",
-      "esri/widgets/Expand",
-      "esri/widgets/Search",
-      "esri/widgets/DistanceMeasurement2D"
-    ], function (
-      WebMap,
-      MapView,
-      GraphicsLayer,
-      Graphic,
-      webMercatorUtils,
-      Sketch,
-      Print,
-      Legend,
-      LayerList,
-      Expand,
-      Search,
-      DistanceMeasurement2D
-    ) {
-      const webmap = new WebMap({
-        portalItem: { id: WEBMAP_ID }
-      });
+    const view = new MapView({
+      container: "viewDiv",
+      map: webmap
+    });
 
-      const view = new MapView({
-        container: "viewDiv",
-        map: webmap
-      });
+    // ルート・スケッチレイヤ
+    const routeLayer = new GraphicsLayer();
+    const sketchLayer = new GraphicsLayer();
+    webmap.addMany([routeLayer, sketchLayer]);
 
-      // ルート・スケッチレイヤ
-      const routeLayer = new GraphicsLayer();
-      const sketchLayer = new GraphicsLayer();
-      webmap.addMany([routeLayer, sketchLayer]);
+    let startGraphic = null;
+    let endGraphic = null;
+    let routeGraphic = null;
 
-      let startGraphic = null;
-      let endGraphic = null;
-      let routeGraphic = null;
-      let distanceMeasurement = null;
+    // 距離計測ウィジェット（DistanceMeasurement2D 用）
+    let distanceMeasurement = null;
 
-      const distanceEl = document.getElementById("distance");
-      const durationEl = document.getElementById("duration");
-      const ascentEl   = document.getElementById("ascent");
-      const descentEl  = document.getElementById("descent");
+    const distanceEl = document.getElementById("distance");
+    const durationEl = document.getElementById("duration");
+    const ascentEl   = document.getElementById("ascent");
+    const descentEl  = document.getElementById("descent");
 
-      const btnCar     = document.getElementById("btn-car");
-      const btnWalk    = document.getElementById("btn-walk");
-      const btnCurrent = document.getElementById("btn-current");
+    const btnCar     = document.getElementById("btn-car");
+    const btnWalk    = document.getElementById("btn-walk");
+    const btnCurrent = document.getElementById("btn-current");
 
-      function setMode(mode) {
-        currentProfile = mode;
-        if (mode === "driving-car") {
-          btnCar.classList.add("active");
-          btnWalk.classList.remove("active");
-        } else {
-          btnWalk.classList.add("active");
-          btnCar.classList.remove("active");
-        }
-        if (startGraphic && endGraphic) {
-          requestRoute();
-        }
+    function setMode(mode) {
+      currentProfile = mode;
+      if (mode === "driving-car") {
+        btnCar.classList.add("active");
+        btnWalk.classList.remove("active");
+      } else {
+        btnWalk.classList.add("active");
+        btnCar.classList.remove("active");
       }
-
-      btnCar.addEventListener("click", function () { setMode("driving-car"); });
-      btnWalk.addEventListener("click", function () { setMode("foot-walking"); });
-
-      // 標高グラフ消去
-      function clearElevationChart() {
-        const canvas = document.getElementById("elevationChart");
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        const w = canvas.width  = canvas.clientWidth;
-        const h = canvas.height = canvas.clientHeight;
-        ctx.clearRect(0, 0, w, h);
-
-        const elevStatsEl = document.getElementById("elevation-stats");
-        if (elevStatsEl) {
-          elevStatsEl.textContent = "min: – m ／ max: – m";
-        }
+      if (startGraphic && endGraphic) {
+        requestRoute();
       }
+    }
 
-      function resetRoute() {
-        routeLayer.removeMany(
-          [startGraphic, endGraphic, routeGraphic].filter(function (g) { return g; })
-        );
-        startGraphic = null;
-        endGraphic = null;
-        routeGraphic = null;
+    btnCar.addEventListener("click", function () { setMode("driving-car"); });
+    btnWalk.addEventListener("click", function () { setMode("foot-walking"); });
 
-        distanceEl.textContent = "–";
-        durationEl.textContent = "–";
-        ascentEl.textContent   = "–";
-        descentEl.textContent  = "–";
+    // 標高グラフ消去
+    function clearElevationChart() {
+      const canvas = document.getElementById("elevationChart");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width  = canvas.clientWidth;
+      const h = canvas.height = canvas.clientHeight;
+      ctx.clearRect(0, 0, w, h);
 
+      const elevStatsEl = document.getElementById("elevation-stats");
+      if (elevStatsEl) {
+        elevStatsEl.textContent = "min: – m ／ max: – m";
+      }
+    }
+
+    function resetRoute() {
+      routeLayer.removeMany(
+        [startGraphic, endGraphic, routeGraphic].filter(function (g) { return g; })
+      );
+      startGraphic = null;
+      endGraphic = null;
+      routeGraphic = null;
+
+      distanceEl.textContent = "–";
+      durationEl.textContent = "–";
+      ascentEl.textContent   = "–";
+      descentEl.textContent  = "–";
+
+      clearElevationChart();
+    }
+
+    // 標高プロファイル描画（シンプル版）
+    function updateElevationChart(coords) {
+      const canvas = document.getElementById("elevationChart");
+      if (!canvas) return;
+
+      if (!coords || coords.length === 0) {
         clearElevationChart();
+        return;
       }
 
-      // 標高プロファイル描画（シンプル版）
-      function updateElevationChart(coords) {
-        const canvas = document.getElementById("elevationChart");
-        if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width  = canvas.clientWidth;
+      const h = canvas.height = canvas.clientHeight;
+      ctx.clearRect(0, 0, w, h);
 
-        if (!coords || coords.length === 0) {
-          clearElevationChart();
-          return;
-        }
+      const distances = [0];
+      const elevations = [];
 
-        const ctx = canvas.getContext("2d");
-        const w = canvas.width  = canvas.clientWidth;
-        const h = canvas.height = canvas.clientHeight;
-        ctx.clearRect(0, 0, w, h);
+      const first = coords[0];
+      const z0 = first.length > 2 ? first[2] : 0;
+      elevations.push(z0);
 
-        const distances = [0];
-        const elevations = [];
+      let totalDist = 0;
+      for (let i = 1; i < coords.length; i++) {
+        const prev = coords[i - 1];
+        const curr = coords[i];
 
-        const first = coords[0];
-        const z0 = first.length > 2 ? first[2] : 0;
-        elevations.push(z0);
+        const lon1 = prev[0], lat1 = prev[1];
+        const lon2 = curr[0], lat2 = curr[1];
 
-        var totalDist = 0;
-        for (var i = 1; i < coords.length; i++) {
-          const prev = coords[i - 1];
-          const curr = coords[i];
+        const xy1 = webMercatorUtils.lngLatToXY(lon1, lat1);
+        const xy2 = webMercatorUtils.lngLatToXY(lon2, lat2);
+        const dx = xy2[0] - xy1[0];
+        const dy = xy2[1] - xy1[1];
+        const segDist = Math.sqrt(dx * dx + dy * dy);
 
-          const lon1 = prev[0], lat1 = prev[1];
-          const lon2 = curr[0], lat2 = curr[1];
+        totalDist += segDist;
+        distances.push(totalDist);
 
-          const xy1 = webMercatorUtils.lngLatToXY(lon1, lat1);
-          const xy2 = webMercatorUtils.lngLatToXY(lon2, lat2);
-          const dx = xy2[0] - xy1[0];
-          const dy = xy2[1] - xy1[1];
-          const segDist = Math.sqrt(dx * dx + dy * dy);
-
-          totalDist += segDist;
-          distances.push(totalDist);
-
-          const z = curr.length > 2 ? curr[2] : z0;
-          elevations.push(z);
-        }
-
-        const distKm = distances.map(function (d) { return d / 1000; });
-        const minElev = Math.min.apply(null, elevations);
-        const maxElev = Math.max.apply(null, elevations);
-        const pad = (maxElev - minElev) * 0.1 || 10;
-        const yMin = minElev - pad;
-        const yMax = maxElev + pad;
-
-        // ★ min / max 表示
-        const elevStatsEl = document.getElementById("elevation-stats");
-        if (elevStatsEl) {
-          const minDisp = Math.round(minElev * 10) / 10;
-          const maxDisp = Math.round(maxElev * 10) / 10;
-          elevStatsEl.textContent =
-            "min: " + minDisp + " m ／ max: " + maxDisp + " m";
-        }
-
-        // 軸
-        ctx.strokeStyle = "#666";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(30, 5);
-        ctx.lineTo(30, h - 15);
-        ctx.lineTo(w - 5, h - 15);
-        ctx.stroke();
-
-        // 折れ線
-        ctx.strokeStyle = "rgba(0,90,160,0.9)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        for (var j = 0; j < elevations.length; j++) {
-          const t = distKm[j] / distKm[distKm.length - 1] || 0;
-          const x = 30 + t * (w - 35);
-          const ratio = (elevations[j] - yMin) / (yMax - yMin || 1);
-          const y = (h - 15) - ratio * (h - 25);
-          if (j === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
+        const z = curr.length > 2 ? curr[2] : z0;
+        elevations.push(z);
       }
 
-      async function requestRoute() {
-        if (!startGraphic || !endGraphic) return;
+      const distKm = distances.map(function (d) { return d / 1000; });
+      const minElev = Math.min.apply(null, elevations);
+      const maxElev = Math.max.apply(null, elevations);
+      const pad = (maxElev - minElev) * 0.1 || 10;
+      const yMin = minElev - pad;
+      const yMax = maxElev + pad;
 
-        const startGeo = webMercatorUtils.webMercatorToGeographic(
-          startGraphic.geometry
-        );
-        const endGeo = webMercatorUtils.webMercatorToGeographic(
-          endGraphic.geometry
-        );
+      // ★ min / max 表示
+      const elevStatsEl = document.getElementById("elevation-stats");
+      if (elevStatsEl) {
+        const minDisp = Math.round(minElev * 10) / 10;
+        const maxDisp = Math.round(maxElev * 10) / 10;
+        elevStatsEl.textContent =
+          "min: " + minDisp + " m ／ max: " + maxDisp + " m";
+      }
 
-        // Cloudflare Worker プロキシに投げる
-        const body = {
-          profile: currentProfile,   // "driving-car" or "foot-walking"
-          coordinates: [
-            [startGeo.x, startGeo.y],
-            [endGeo.x, endGeo.y]
-          ]
-        };
+      // 軸
+      ctx.strokeStyle = "#666";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(30, 5);
+      ctx.lineTo(30, h - 15);
+      ctx.lineTo(w - 5, h - 15);
+      ctx.stroke();
 
-        const res = await fetch(ORS_PROXY_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json; charset=utf-8"
-          },
-          body: JSON.stringify(body)
-        });
-        //
+      // 折れ線
+      ctx.strokeStyle = "rgba(0,90,160,0.9)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let j = 0; j < elevations.length; j++) {
+        const t = distKm[j] / distKm[distKm.length - 1] || 0;
+        const x = 30 + t * (w - 35);
+        const ratio = (elevations[j] - yMin) / (yMax - yMin || 1);
+        const y = (h - 15) - ratio * (h - 25);
+        if (j === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
 
-        if (!res.ok) {
-          alert("ルート計算に失敗しました (HTTP " + res.status + ")");
-          return;
+    async function requestRoute() {
+      if (!startGraphic || !endGraphic) return;
+
+      const startGeo = webMercatorUtils.webMercatorToGeographic(
+        startGraphic.geometry
+      );
+      const endGeo = webMercatorUtils.webMercatorToGeographic(
+        endGraphic.geometry
+      );
+
+      // Cloudflare Worker プロキシに投げる
+      const body = {
+        profile: currentProfile,   // "driving-car" or "foot-walking"
+        coordinates: [
+          [startGeo.x, startGeo.y],
+          [endGeo.x, endGeo.y]
+        ]
+      };
+
+      const res = await fetch(ORS_PROXY_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json; charset=utf-8"
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        alert("ルート計算に失敗しました (HTTP " + res.status + ")");
+        return;
+      }
+
+      const json = await res.json();
+      const feature = json.features[0];
+      const props = feature.properties || {};
+      const summary = props.summary || (props.segments && props.segments[0]) || {};
+
+      if (routeGraphic) {
+        routeLayer.remove(routeGraphic);
+        routeGraphic = null;
+      }
+
+      const coords = feature.geometry.coordinates;
+      updateElevationChart(coords);
+
+      const paths = coords.map(function (c) {
+        const lon = c[0];
+        const lat = c[1];
+        const xy = webMercatorUtils.lngLatToXY(lon, lat);
+        return [xy[0], xy[1]];
+      });
+
+      const polyline = {
+        type: "polyline",
+        paths: [paths],
+        spatialReference: view.spatialReference
+      };
+
+      routeGraphic = new Graphic({
+        geometry: polyline,
+        symbol: {
+          type: "simple-line",
+          color: [0, 0, 255, 0.8],
+          width: 3
         }
+      });
 
-        const json = await res.json();
-        const feature = json.features[0];
-        const props = feature.properties || {};
-        const summary = props.summary || (props.segments && props.segments[0]) || {};
+      routeLayer.add(routeGraphic);
+      view.goTo(routeGraphic.geometry.extent.expand(1.3));
 
-        if (routeGraphic) {
-          routeLayer.remove(routeGraphic);
-          routeGraphic = null;
-        }
+      const distanceKm =
+        summary.distance != null ? (summary.distance / 1000).toFixed(1) : "–";
+      const durationMin =
+        summary.duration != null ? (summary.duration / 60).toFixed(1) : "–";
+      const ascent =
+        summary.ascent != null ? Math.round(summary.ascent) : "–";
+      const descent =
+        summary.descent != null ? Math.round(summary.descent) : "–";
 
-        const coords = feature.geometry.coordinates;
-        updateElevationChart(coords);
+      distanceEl.textContent = distanceKm;
+      durationEl.textContent = durationMin;
+      ascentEl.textContent   = ascent;
+      descentEl.textContent  = descent;
+    }
 
-        const paths = coords.map(function (c) {
-          const lon = c[0];
-          const lat = c[1];
-          const xy = webMercatorUtils.lngLatToXY(lon, lat);
-          return [xy[0], xy[1]];
-        });
+    // 地図クリック：出発地／到着地
+    view.on("click", function (event) {
 
-        const polyline = {
-          type: "polyline",
-          paths: [paths],
-          spatialReference: view.spatialReference
-        };
+      // 距離計測中はルート指定をスキップ
+      if (distanceMeasurement &&
+          distanceMeasurement.viewModel &&
+          distanceMeasurement.viewModel.state === "measuring") {
+        return;
+      }
 
-        routeGraphic = new Graphic({
-          geometry: polyline,
+      const point = event.mapPoint;
+
+      if (!startGraphic) {
+        resetRoute();
+        startGraphic = new Graphic({
+          geometry: point,
           symbol: {
-            type: "simple-line",
-            color: [0, 0, 255, 0.8],
-            width: 3
+            type: "simple-marker",
+            color: "green",
+            size: 10,
+            outline: { color: "white", width: 1 }
           }
         });
+        routeLayer.add(startGraphic);
+      } else if (!endGraphic) {
+        endGraphic = new Graphic({
+          geometry: point,
+          symbol: {
+            type: "simple-marker",
+            color: "red",
+            size: 10,
+            outline: { color: "white", width: 1 }
+          }
+        });
+        routeLayer.add(endGraphic);
+        requestRoute();
+      } else {
+        resetRoute();
+        startGraphic = new Graphic({
+          geometry: point,
+          symbol: {
+            type: "simple-marker",
+            color: "green",
+            size: 10,
+            outline: { color: "white", width: 1 }
+          }
+        });
+        routeLayer.add(startGraphic);
+      }
+    });
 
-        routeLayer.add(routeGraphic);
-        view.goTo(routeGraphic.geometry.extent.expand(1.3));
-
-        const distanceKm =
-          summary.distance != null ? (summary.distance / 1000).toFixed(1) : "–";
-        const durationMin =
-          summary.duration != null ? (summary.duration / 60).toFixed(1) : "–";
-        const ascent =
-          summary.ascent != null ? Math.round(summary.ascent) : "–";
-        const descent =
-          summary.descent != null ? Math.round(summary.descent) : "–";
-
-        distanceEl.textContent = distanceKm;
-        durationEl.textContent = durationMin;
-        ascentEl.textContent   = ascent;
-        descentEl.textContent  = descent;
+    // 現在地ボタン
+    btnCurrent.addEventListener("click", function () {
+      if (!navigator.geolocation) {
+        alert("このブラウザは現在地取得に対応していません。");
+        return;
       }
 
-      // 地図クリック：出発地／到着地
-      view.on("click", function (event) {
+      navigator.geolocation.getCurrentPosition(
+        function (pos) {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
 
-        // 計測ツール動作中・ルート処理はスキップ
-        if (distanceMeasurement &&
-            distanceMeasurement.viewModel &&
-            distanceMeasurement.viewModel.state === "measuring") {
-          return;
-        }
-        const point = event.mapPoint;
+          const xy = webMercatorUtils.lngLatToXY(lon, lat);
+          const point = {
+            type: "point",
+            x: xy[0],
+            y: xy[1],
+            spatialReference: view.spatialReference
+          };
 
-        if (!startGraphic) {
           resetRoute();
           startGraphic = new Graphic({
             geometry: point,
@@ -587,181 +648,123 @@
             }
           });
           routeLayer.add(startGraphic);
-        } else if (!endGraphic) {
-          endGraphic = new Graphic({
-            geometry: point,
-            symbol: {
-              type: "simple-marker",
-              color: "red",
-              size: 10,
-              outline: { color: "white", width: 1 }
-            }
-          });
-          routeLayer.add(endGraphic);
-          requestRoute();
-        } else {
-          resetRoute();
-          startGraphic = new Graphic({
-            geometry: point,
-            symbol: {
-              type: "simple-marker",
-              color: "green",
-              size: 10,
-              outline: { color: "white", width: 1 }
-            }
-          });
-          routeLayer.add(startGraphic);
+
+          view.goTo({ target: point, zoom: 15 });
+        },
+        function (err) {
+          console.error(err);
+          alert("現在地を取得できませんでした。位置情報の許可設定をご確認ください。");
         }
-      });
-
-      // 現在地ボタン
-      btnCurrent.addEventListener("click", function () {
-        if (!navigator.geolocation) {
-          alert("このブラウザは現在地取得に対応していません。");
-          return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-          function (pos) {
-            const lat = pos.coords.latitude;
-            const lon = pos.coords.longitude;
-
-            const xy = webMercatorUtils.lngLatToXY(lon, lat);
-            const point = {
-              type: "point",
-              x: xy[0],
-              y: xy[1],
-              spatialReference: view.spatialReference
-            };
-
-            resetRoute();
-            startGraphic = new Graphic({
-              geometry: point,
-              symbol: {
-                type: "simple-marker",
-                color: "green",
-                size: 10,
-                outline: { color: "white", width: 1 }
-              }
-            });
-            routeLayer.add(startGraphic);
-
-            view.goTo({ target: point, zoom: 15 });
-          },
-          function (err) {
-            console.error(err);
-            alert("現在地を取得できませんでした。位置情報の許可設定をご確認ください。");
-          }
-        );
-      });
-
-      // Search ヴィジット
-      const searchWidget = new Search({
-        view: view,
-        includeDefaultSources: true,
-        popupEnabled: true,
-        locationEnabled: true
-      });
-      const searchExpand = new Expand({
-        view: view,
-        content: searchWidget,
-        expanded: false,
-        expandTooltip: "場所を検索",
-        icon: "esri-icon-search",
-        group: "top-right-tools",
-        autoCollapse: true
-      });
-      view.ui.add(searchExpand, "top-right");
-      
-      // Sketch ウィジェット（Expand で折りたたみ）
-      const sketch = new Sketch({
-        view: view,
-        layer: sketchLayer,
-        availableCreateTools: ["point", "polyline", "polygon", "rectangle", "circle", "text"],
-        creationMode: "update"
-      });
-      const sketchExpand = new Expand({
-        view: view,
-        content: sketch,
-        expanded: false,
-        expandTooltip: "描画ツール",
-        icon: "esri-icon-edit",
-        group: "top-right-tools",
-        autoCollapse: true
-      });
-      view.ui.add(sketchExpand, "top-right");
-
-      // Measurement & Print ウィジェットは view が準備できてから追加
-      view.when(function () {
-
-        // 計測ウィジェット
-        distanceMeasurement2D = new DistanceMeasurement2D({
-          view: view,
-          unit: "kilometers"
-        });
-
-        const measurementExpand = new Expand({
-          view: view,
-          content: distanceMeasurement,
-          expanded: false,
-          expandTooltip: "距離・面積を計測",
-          icon: "esri-icon-measure-line",
-          group: "top-right-tools",
-          autoCollapse: true
-        });
-        view.ui.add(measurementExpand, "top-right");
-
-        // Print ウィジェット（Expand でアイコン化）
-        const print = new Print({
-          view: view,
-          templateOptions: {
-            title: "わたしの地域医療・防災マップ"
-          }
-        });
-        const printExpand = new Expand({
-          view: view,
-          content: print,
-          expanded: false,
-          expandTooltip: "印刷",
-          group: "top-right-tools",
-          autoCollapse: true
-        });
-        view.ui.add(printExpand, {
-          position: "top-left",
-          index: 2
-        });
-      });
-
-
-      // 凡例 & レイヤーリスト（Expand）
-      const legend = new Legend({ view: view });
-      const legendExpand = new Expand({
-        view: view,
-        content: legend,
-        expanded: false,
-        expandTooltip: "凡例",
-        icon: "esri-icon-layer-list",
-        group: "left-tools",
-        autoCollapse: true
-      });
-
-      const layerList = new LayerList({ view: view });
-      const layerListExpand = new Expand({
-        view: view,
-        content: layerList,
-        expanded: false,
-        expandTooltip: "レイヤー",
-        icon: "esri-icon-table",
-        group: "left-tools",
-        autoCollapse: true
-      });
-
-      view.ui.add(legendExpand, "bottom-left");
-      view.ui.add(layerListExpand, "top-left");
+      );
     });
-  </script>
+
+    // Search ヴィジェット
+    const searchWidget = new Search({
+      view: view,
+      includeDefaultSources: true,
+      popupEnabled: true,
+      locationEnabled: true
+    });
+    const searchExpand = new Expand({
+      view: view,
+      content: searchWidget,
+      expanded: false,
+      expandTooltip: "場所を検索",
+      icon: "esri-icon-search",
+      group: "top-right-tools",
+      autoCollapse: true
+    });
+    view.ui.add(searchExpand, "top-right");
+
+    // Sketch ウィジェット（Expand で折りたたみ）
+    const sketch = new Sketch({
+      view: view,
+      layer: sketchLayer,
+      availableCreateTools: ["point", "polyline", "polygon", "rectangle", "circle", "text"],
+      creationMode: "update"
+    });
+    const sketchExpand = new Expand({
+      view: view,
+      content: sketch,
+      expanded: false,
+      expandTooltip: "描画ツール",
+      icon: "esri-icon-edit",
+      group: "top-right-tools",
+      autoCollapse: true
+    });
+    view.ui.add(sketchExpand, "top-right");
+
+    // 距離計測 & Print ウィジェットは view が準備できてから追加
+    view.when(function () {
+
+      // 距離計測ウィジェット
+      distanceMeasurement = new DistanceMeasurement2D({
+        view: view
+      });
+
+      const measurementExpand = new Expand({
+        view: view,
+        content: distanceMeasurement,
+        expanded: false,
+        expandTooltip: "距離を計測",
+        icon: "esri-icon-measure-line",
+        group: "top-right-tools",
+        autoCollapse: true
+      });
+      view.ui.add(measurementExpand, "top-right");
+
+      // Print ウィジェット
+      const print = new Print({
+        view: view,
+        templateOptions: {
+          title: "わたしの地域医療・防災マップ"
+        }
+      });
+      const printExpand = new Expand({
+        view: view,
+        content: print,
+        expanded: false,
+        expandTooltip: "印刷",
+        group: "top-right-tools",
+        autoCollapse: true
+      });
+      view.ui.add(printExpand, {
+        position: "top-left",
+        index: 2
+      });
+    });
+
+    // 凡例 & レイヤーリスト（Expand）
+    const legend = new Legend({ view: view });
+    const legendExpand = new Expand({
+      view: view,
+      content: legend,
+      expanded: false,
+      expandTooltip: "凡例",
+      icon: "esri-icon-layer-list",
+      group: "left-tools",
+      autoCollapse: true
+    });
+
+    const layerList = new LayerList({ view: view });
+    const layerListExpand = new Expand({
+      view: view,
+      content: layerList,
+      expanded: false,
+      expandTooltip: "レイヤー",
+      icon: "esri-icon-table",
+      group: "left-tools",
+      autoCollapse: true
+    });
+
+    view.ui.add(legendExpand, "bottom-left");
+    view.ui.add(layerListExpand, "top-left");
+  });
+</script>
+
 </body>
 </html>
+
 
 
 
