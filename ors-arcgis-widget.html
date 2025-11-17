@@ -151,7 +151,23 @@
       object-fit: contain;
     }
 
+    #elevation-panel {
+      padding: 4px 10px 6px;
+      border-bottom:1px solid #ccc;
+      background: #fafafa
+    }
 
+    #elevation-title {
+      font-size: 12px;
+      margin-bottom: 2px;
+      color: #333
+    }
+
+    #elevationChart {
+      width: 100%;
+      height: 80px;
+    }
+    
     @media (max-width: 600px) {
       #info {
         font-size: 11px;
@@ -161,6 +177,7 @@
       }
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
@@ -214,6 +231,10 @@
           上り: <span id="ascent" class="value">–</span> m ／
           下り: <span id="descent" class="value">–</span> m
         </div>
+        <div id="elevation-panel">
+          <div id="elevation-title">ルートの高低差</div>
+          <canvas id="elevationChart"></canvas>
+        </div>
       </div>
     </div>
     <div id="viewDiv"></div>
@@ -259,6 +280,7 @@
       LayerList,
       Expand
     ) {
+      let elevationChart = null;
       const webmap = new WebMap({
         portalItem: {
           id: WEBMAP_ID
@@ -324,7 +346,111 @@
         durationEl.textContent = "–";
         ascentEl.textContent   = "–";
         descentEl.textContent  = "–";
+
+        // ★ 標高グラフリセット
+        if (elevationChart) {
+          elevationChart.destroy();
+          elevationChart = null;
+        }
       }
+
+        function updateElevationChart(coords) {
+          const canvas = document.getElementById("elevationChart");
+          if (!canvas) return;
+
+          // coords: ORS の geometry.coordinates（[lon, lat, z] の配列）
+          if (!coords || coords.length === 0) {
+            if (elevationChart) {
+              elevationChart.destroy();
+              elevationChart = null;
+            }
+            return;
+          }
+
+          // 距離と標高の配列を作成
+          const distances = [0];  // m
+          const elevations = [];
+
+          // 最初の点
+          const first = coords[0];
+          const z0 = first.length > 2 ? first[2] : 0;
+          elevations.push(z0);
+
+          let totalDist = 0;
+
+          for (let i = 1; i < coords.length; i++) {
+            const prev = coords[i - 1];
+            const curr = coords[i];
+
+            const lon1 = prev[0], lat1 = prev[1];
+            const lon2 = curr[0], lat2 = curr[1];
+
+            // Webメルカトルに変換してユークリッド距離[m]を近似
+            const xy1 = webMercatorUtils.lngLatToXY(lon1, lat1);
+            const xy2 = webMercatorUtils.lngLatToXY(lon2, lat2);
+            const dx = xy2[0] - xy1[0];
+            const dy = xy2[1] - xy1[1];
+            const segDist = Math.sqrt(dx * dx + dy * dy); // m
+
+            totalDist += segDist;
+            distances.push(totalDist);
+
+            const z = curr.length > 2 ? curr[2] : z0;
+            elevations.push(z);
+          }
+
+          // m → km にして小数1桁くらい
+          const distKm = distances.map(d => (d / 1000));
+
+          const ctx = canvas.getContext("2d");
+
+          if (elevationChart) {
+            elevationChart.destroy();
+          }
+
+          elevationChart = new Chart(ctx, {
+            type: "line",
+            data: {
+              labels: distKm,
+              datasets: [
+                {
+                  label: "標高 (m)",
+                  data: elevations,
+                  borderColor: "rgba(0, 90, 160, 0.9)",
+                  backgroundColor: "rgba(0, 90, 160, 0.2)",
+                  tension: 0.1,
+                  pointRadius: 0
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                x: {
+                  title: { display: true, text: "距離 (km)", font: { size: 10 } },
+                  ticks: { maxTicksLimit: 6, font: { size: 9 } }
+                },
+                y: {
+                  title: { display: true, text: "標高 (m)", font: { size: 10 } },
+                  ticks: { font: { size: 9 } }
+                }
+              },
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: function (ctx) {
+                      const d = ctx.parsed.x.toFixed(2);
+                      const h = ctx.parsed.y.toFixed(0);
+                      return `${d} km, ${h} m`;
+                    }
+                  }
+                }
+              }
+            }
+          });
+        }
 
       async function requestRoute() {
         if (!startGraphic || !endGraphic) return;
@@ -374,6 +500,10 @@
         }
 
         const coords = feature.geometry.coordinates;
+
+        // ★ 標高プロファイルを更新
+        updateElevationChart(coords);
+        
         const paths = coords.map(function (c) {
           const lon = c[0];
           const lat = c[1];
@@ -567,5 +697,6 @@
   </script>
 </body>
 </html>
+
 
 
