@@ -147,11 +147,6 @@
       height: 32px;
       object-fit: contain;
     }
-    .elevation-stats {
-      font-size: 11px;
-      color: #555;
-      margin-top: 2px;
-    }
 
     /* 標高プロファイルパネル */
     #elevation-panel {
@@ -167,6 +162,11 @@
     #elevationChart {
       width: 100%;
       height: 80px;
+    }
+    .elevation-stats {
+      font-size: 11px;
+      color: #555;
+      margin-top: 2px;
     }
 
     @media (max-width: 600px) {
@@ -228,6 +228,8 @@
         <div id="stats">
           距離: <span id="distance" class="value">–</span> km ／
           時間: <span id="duration" class="value">–</span> 分 ／
+          上り: <span id="ascent" class="value">–</span> m ／
+          下り: <span id="descent" class="value">–</span> m
         </div>
       </div>
     </div>
@@ -237,8 +239,10 @@
       <div id="elevation-title">ルートの高低差</div>
       <canvas id="elevationChart"></canvas>
       <div id="elevation-stats" class="elevation-stats">
-        min: - m ／ max: - m
+        min: – m ／ max: – m
+      </div>
     </div>
+
     <div id="viewDiv"></div>
   </div>
 
@@ -326,7 +330,7 @@
       btnCar.addEventListener("click", function () { setMode("driving-car"); });
       btnWalk.addEventListener("click", function () { setMode("foot-walking"); });
 
-      // 標高グラフを消去
+      // 標高グラフ消去
       function clearElevationChart() {
         const canvas = document.getElementById("elevationChart");
         if (!canvas) return;
@@ -334,6 +338,11 @@
         const w = canvas.width  = canvas.clientWidth;
         const h = canvas.height = canvas.clientHeight;
         ctx.clearRect(0, 0, w, h);
+
+        const elevStatsEl = document.getElementById("elevation-stats");
+        if (elevStatsEl) {
+          elevStatsEl.textContent = "min: – m ／ max: – m";
+        }
       }
 
       function resetRoute() {
@@ -350,11 +359,6 @@
         descentEl.textContent  = "–";
 
         clearElevationChart();
-        // ★ min / max 表示もリセット
-        const elevStatsEl = document.getElementById("elevation-stats");
-        if (elevStatsEl) {
-          elevStatsEl.textContent = "min: – m ／ max: – m";
-        }        
       }
 
       // 標高プロファイル描画（シンプル版）
@@ -407,7 +411,7 @@
         const yMin = minElev - pad;
         const yMax = maxElev + pad;
 
-        // ★ min / max を画面に表示（小数1桁で丸め）
+        // ★ min / max 表示
         const elevStatsEl = document.getElementById("elevation-stats");
         if (elevStatsEl) {
           const minDisp = Math.round(minElev * 10) / 10;
@@ -614,7 +618,7 @@
         );
       });
 
-      // Sketch ウィジェット
+      // Sketch ウィジェット（Expand で折りたたみ）
       const sketch = new Sketch({
         view: view,
         layer: sketchLayer,
@@ -625,10 +629,11 @@
         view: view,
         content: sketch,
         expanded: false,
-        expandTooltip: "描画ツール"
+        expandTooltip: "描画ツール",
+        icon: "esri-icon-edit"
       });
-      view.ui.add(sketchExpand, "top-right")
-      
+      view.ui.add(sketchExpand, "top-right");
+
       // Print ウィジェット（Expand でアイコン化）
       const print = new Print({
         view: view,
@@ -672,5 +677,3 @@
   </script>
 </body>
 </html>
-
-
