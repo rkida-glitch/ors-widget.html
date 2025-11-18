@@ -713,6 +713,20 @@
       });
       view.ui.add(measurementExpand, "top-right");
 
+      // パネルを閉じたら計測結果を自動クリア
+      measurementExpand.watch("expanded", function (expanded) {
+        if (!expanded && distanceMeasurement) {
+          // DistanceMeasurement2D の結果を消す
+          if (distanceMeasurement.clear) {
+            distanceMeasurement.clear();
+          } else if (distanceMeasurement.viewModel &&
+                     distanceMeasurement.viewModel.clear) {
+            distanceMeasurement.viewModel.clear();
+          }
+        }
+      });
+
+
       // Print ウィジェット
       const print = new Print({
         view: view,
@@ -764,6 +778,7 @@
 
 </body>
 </html>
+
 
 
 
