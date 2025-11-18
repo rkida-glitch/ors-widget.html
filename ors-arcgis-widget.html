@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
@@ -80,6 +80,17 @@
       background: #ffffff;
       cursor: pointer;
       font-size: 12px;
+    }
+
+    .header-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      color: inherit;  /* 文字はそのまま白色 */
+    }
+    .header-link:active {
+      opacity: 0.7;
     }
 
     /* 免責事項モーダル */
@@ -241,9 +252,12 @@
     <div id="info">
       <div id="info-left">
         <div class="header-row">
-          <img src="icon.png" alt="ロゴ" class="header-icon" />
-          <span class="header-title">石川県地域医療・防災マップ（v0.2.2）</span>
+          <a href="ors-arcgis-widget.html" class="header-link">
+            <img src="icon.png" alt="ロゴ" class="header-icon" />
+            <span class="header-title">石川県地域医療・防災マップ（v0.2.2）</span>
+          </a>
         </div>
+
         <div class="header-sub">
           地図上をクリックして出発地・到着地を指定します。<br />
           ・1回目のクリック：出発地（緑） ／ 2回目：到着地（赤） → 自動でルート計算 ／
@@ -778,6 +792,7 @@
 
 </body>
 </html>
+
 
 
 
