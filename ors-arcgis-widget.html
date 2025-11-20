@@ -695,7 +695,10 @@
       view: view,
       layer: sketchLayer,
       availableCreateTools: ["point", "polyline", "polygon", "rectangle", "circle", "text"],
-      creationMode: "update"
+      creationMode: "update",
+      defaultCreateOptions: {
+        mode; "freehand"
+      }
     });
     const sketchExpand = new Expand({
       view: view,
@@ -792,6 +795,7 @@
 
 </body>
 </html>
+
 
 
 
