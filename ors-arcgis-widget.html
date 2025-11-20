@@ -200,7 +200,7 @@
 
       .elevation-stats {
         font-size: 10px;
-        margin-top 0px;
+        margin-top: 0px;
       }
     
       #disclaimer-modal {
@@ -261,7 +261,7 @@
         <div class="header-sub">
           地図上をクリックして出発地・到着地を指定します。<br />
           ・1回目のクリック：出発地（緑） ／ 2回目：到着地（赤） → 自動でルート計算 ／
-          3回目以降：リセットして新しい出発地を指定
+          3回目：ルートリセット
         </div>
       </div>
       <div id="controls">
@@ -269,6 +269,7 @@
         <button id="btn-car" class="mode-button active">車</button>
         <button id="btn-walk" class="mode-button">徒歩</button>
         <button id="btn-current" class="small-button">現在地を出発地に</button>
+        <button id="btn-route-mode" class="small-button">ルート検索：ON</button>
         <div id="stats">
           距離: <span id="distance" class="value">–</span> km ／
           時間: <span id="duration" class="value">–</span> 分 ／
@@ -354,6 +355,7 @@
 
     // 距離計測ウィジェット（DistanceMeasurement2D 用）
     let distanceMeasurement = null;
+    let routeModeOn = true;
 
     const distanceEl = document.getElementById("distance");
     const durationEl = document.getElementById("duration");
@@ -363,6 +365,7 @@
     const btnCar     = document.getElementById("btn-car");
     const btnWalk    = document.getElementById("btn-walk");
     const btnCurrent = document.getElementById("btn-current");
+    const btnRouteMode = document.getElementById("btn-route-mode");
 
     function setMode(mode) {
       currentProfile = mode;
@@ -381,6 +384,32 @@
     btnCar.addEventListener("click", function () { setMode("driving-car"); });
     btnWalk.addEventListener("click", function () { setMode("foot-walking"); });
 
+
+    function updateRouteModeButton() {
+      if (routeModeOn) {
+        btnRouteMode.textContent = "ルート検索：ON";
+        btnRouteMode.style.backgroundColor = "#005ea5";
+        btnRouteMode.style.color = "#ffffff";
+      } else {
+        btnRouteMode.textContent = "ルート検索: OFF";
+        btnRouteMode.style.backgroundColor = "#ffffff";
+        btnRouteMode.style.color = "#000000";
+      }
+    }
+
+    btnRouteMode.addEventListener("click", function () {
+      routeModeOn = !routeModeOn;
+      // OFF にしたタイミングでルート表示をクリアしておくと親切
+      if (!routeModeOn) {
+        resetRoute();
+      }
+      updateRouteModeButton();
+    });
+
+    // 初期状態の表示を反映
+    updateRouteModeButton();
+
+    
     // 標高グラフ消去
     function clearElevationChart() {
       const canvas = document.getElementById("elevationChart");
@@ -580,10 +609,15 @@
       descentEl.textContent  = descent;
     }
 
-    // 地図クリック：出発地／到着地
-    view.on("click", function (event) {
+        view.on("click", function (event) {
 
-      // 距離計測中はルート指定をスキップ
+      // ★ ルート検索モードが OFF のときは、ルート処理は一切しない
+      //    （マップ本来のクリック挙動＝ポップアップ表示などだけが動く）
+      if (!routeModeOn) {
+        return;
+      }
+
+      // 距離計測ツールが「計測中」のときはルート処理をスキップ
       if (distanceMeasurement &&
           distanceMeasurement.viewModel &&
           distanceMeasurement.viewModel.state === "measuring") {
@@ -593,6 +627,7 @@
       const point = event.mapPoint;
 
       if (!startGraphic) {
+        // 1回目クリック：リセットして出発地
         resetRoute();
         startGraphic = new Graphic({
           geometry: point,
@@ -604,7 +639,9 @@
           }
         });
         routeLayer.add(startGraphic);
+
       } else if (!endGraphic) {
+        // 2回目クリック：到着地 → ルート計算
         endGraphic = new Graphic({
           geometry: point,
           symbol: {
@@ -616,18 +653,12 @@
         });
         routeLayer.add(endGraphic);
         requestRoute();
+
       } else {
+        // 3回目クリック：リセットだけ（新しい出発地は置かない）
         resetRoute();
-        startGraphic = new Graphic({
-          geometry: point,
-          symbol: {
-            type: "simple-marker",
-            color: "green",
-            size: 10,
-            outline: { color: "white", width: 1 }
-          }
-        });
-        routeLayer.add(startGraphic);
+        // ここで return するのがポイント
+        return;
       }
     });
 
@@ -700,6 +731,17 @@
         mode: "freehand"
       }
     });
+    // ★ 連続描画モード
+
+    sketch.on("create", function (event) {
+      if (event.state === "complete") {
+        const tool = event.tool;
+        if (tool) {
+          sketch.create(tool);   // 同じツールを連続開始
+        }
+      }
+    });
+    
     const sketchExpand = new Expand({
       view: view,
       content: sketch,
@@ -795,6 +837,7 @@
 
 </body>
 </html>
+
 
 
 
