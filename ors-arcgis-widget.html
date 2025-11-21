@@ -735,6 +735,37 @@
       }
     });
 
+    // --- Sketch 図形のデフォルトシンボル変更 ---
+    // polyline → 赤い線
+    sketch.viewModel.polylineSymbol = {
+      type: "simple-line",
+      color: [255, 0, 0, 1],
+      width: 2
+    };
+    
+    // polygon → 枠線赤・塗りつぶしなし
+    sketch.viewModel.polygonSymbol = {
+      type: "simple-fill",
+      color: [0, 0, 0, 0],         // 完全透明
+      outline: {
+        color: [255, 0, 0, 1],
+        width: 2
+      }
+    };
+    
+    // point → 塗りつぶし赤・枠黒
+    sketch.viewModel.pointSymbol = {
+      type: "simple-marker",
+      style: "circle",
+      color: [255, 0, 0, 1],       // 中を赤
+      size: 10,
+      outline: {
+        color: [0, 0, 0, 1],       // 枠を黒
+        width: 1.5
+      }
+    };
+
+
     // 連続描画：1ストローク完了後も同じツールを継続
     sketch.on("create", function (event) {
       if (event.state === "complete") {
@@ -864,3 +895,4 @@
 
 </body>
 </html>
+
