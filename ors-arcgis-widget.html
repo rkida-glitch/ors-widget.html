@@ -755,7 +755,23 @@
 
     // 距離計測 & Print ウィジェットは view が準備できてから追加
     view.when(function () {
+    // 距離計測 & Print ウィジェットは view が準備できてから追加
+    view.when(function () {
 
+      // ★ polylineツールのアイコンを鉛筆マークに差し替え
+      //   SketchウィジェットがDOMに描画されるのを少し待ってから実行
+      setTimeout(function () {
+        // data-type="polyline" のボタンの中にある、polylineアイコン要素を探す
+        const polyIcon = document.querySelector(
+          '.esri-sketch__button[data-type="polyline"] .esri-icon-polyline'
+        );
+
+      if (polyIcon) {
+        polyIcon.classList.remove("esri-icon-polyline");
+        polyIcon.classList.add("esri-icon-edit");
+      }
+    }, 500);
+  
       // 距離計測ウィジェット
       distanceMeasurement = new DistanceMeasurement2D({
         view: view
@@ -837,6 +853,7 @@
 
 </body>
 </html>
+
 
 
 
