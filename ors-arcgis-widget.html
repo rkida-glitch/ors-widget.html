@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <title>石川県地域医療・防災マップv0.2.4</title>
-  <link rel="icon" href="favicon.png" type="image/png" />
+
   <!-- ArcGIS Maps SDK for JavaScript -->
   <link
     rel="stylesheet"
@@ -315,8 +315,7 @@
     "esri/widgets/LayerList",
     "esri/widgets/Expand",
     "esri/widgets/Search",
-    "esri/widgets/DistanceMeasurement2D",
-    "esri/symbols/TextSymbol"
+    "esri/widgets/DistanceMeasurement2D"
   ], function (
     WebMap,
     MapView,
@@ -329,8 +328,7 @@
     LayerList,
     Expand,
     Search,
-    DistanceMeasurement2D,
-    TextSymbol
+    DistanceMeasurement2D
   ) {
 
     const webmap = new WebMap({
@@ -342,14 +340,15 @@
       map: webmap
     });
 
-    const routeLayer = new GraphicsLayer();
+    const routeLayer  = new GraphicsLayer();
     const sketchLayer = new GraphicsLayer();
     webmap.addMany([routeLayer, sketchLayer]);
 
     let startGraphic = null;
-    let endGraphic = null;
+    let endGraphic   = null;
     let routeGraphic = null;
     let distanceMeasurement = null;
+    let textMemoModeOn = false;   // ★ テキストメモモード
 
     const distanceEl = document.getElementById("distance");
     const durationEl = document.getElementById("duration");
@@ -420,7 +419,7 @@
         [startGraphic, endGraphic, routeGraphic].filter(function (g) { return g; })
       );
       startGraphic = null;
-      endGraphic = null;
+      endGraphic   = null;
       routeGraphic = null;
 
       distanceEl.textContent = "–";
@@ -445,7 +444,7 @@
       const h = canvas.height = canvas.clientHeight;
       ctx.clearRect(0, 0, w, h);
 
-      const distances = [0];
+      const distances  = [0];
       const elevations = [];
 
       const first = coords[0];
@@ -473,7 +472,7 @@
         elevations.push(z);
       }
 
-      const distKm = distances.map(function (d) { return d / 1000; });
+      const distKm  = distances.map(function (d) { return d / 1000; });
       const minElev = Math.min.apply(null, elevations);
       const maxElev = Math.max.apply(null, elevations);
       const pad = (maxElev - minElev) * 0.1 || 10;
@@ -524,7 +523,7 @@
         profile: currentProfile,
         coordinates: [
           [startGeo.x, startGeo.y],
-          [endGeo.x, endGeo.y]
+          [endGeo.x,  endGeo.y]
         ]
       };
 
@@ -541,9 +540,9 @@
         return;
       }
 
-      const json = await res.json();
+      const json    = await res.json();
       const feature = json.features[0];
-      const props = feature.properties || {};
+      const props   = feature.properties || {};
       const summary = props.summary || (props.segments && props.segments[0]) || {};
 
       if (routeGraphic) {
@@ -557,7 +556,7 @@
       const paths = coords.map(function (c) {
         const lon = c[0];
         const lat = c[1];
-        const xy = webMercatorUtils.lngLatToXY(lon, lat);
+        const xy  = webMercatorUtils.lngLatToXY(lon, lat);
         return [xy[0], xy[1]];
       });
 
@@ -594,7 +593,34 @@
       descentEl.textContent  = descent;
     }
 
+    // クリック挙動：テキストメモ → ルート
     view.on("click", function (event) {
+
+      // ★ テキストメモモードが ON のときは、メモだけ処理して終了
+      if (textMemoModeOn) {
+        const point = event.mapPoint;
+        const text = prompt("表示するテキストを入力してください：", "");
+        if (text && text.trim() !== "") {
+          const memoGraphic = new Graphic({
+            geometry: point,
+            symbol: {
+              type: "text",
+              text: text.trim(),
+              color: "black",
+              haloColor: "white",
+              haloSize: 2,
+              font: {
+                size: 12,
+                family: "sans-serif"
+              }
+            }
+          });
+          sketchLayer.add(memoGraphic);
+        }
+        return;
+      }
+
+      // ★ ここから下はルート検索モードのときだけ
       if (!routeModeOn) return;
 
       if (distanceMeasurement &&
@@ -675,7 +701,7 @@
       );
     });
 
-    // 描画クリアボタン：スケッチを全部消す
+    // 描画クリアボタン：スケッチレイヤーを全部消す（手書き & テキストメモ共通）
     btnClearDraw.addEventListener("click", function () {
       sketchLayer.removeAll();
     });
@@ -698,10 +724,7 @@
     });
     view.ui.add(searchExpand, "top-right");
 
-    
-
-    
-    // Sketch ウィジェット（手書き向け設定）
+    // Sketch ウィジェット（polyline / polygon / point）
     const sketch = new Sketch({
       view: view,
       layer: sketchLayer,
@@ -712,47 +735,15 @@
       }
     });
 
-    // point を「テキストメモ用」の記号にする（初期シンボル）
-    sketch.viewModel.pointSymbol = new TextSymbol({
-      text: "メモ",
-      color: "black",
-      haloColor: "white",
-      haloSize: 2,
-      font: {
-        size: 12,
-        family: "sans-serif"
-        }
-      });
-
-    // 手書き＆テキスト入力の挙動をカスタマイズ
+    // 連続描画：1ストローク完了後も同じツールを継続
     sketch.on("create", function (event) {
-
-      // まだ描画中（"start" / "active"）のときは何もしない
-      if (event.state !== "complete") {
-        return;
-      }
-    
-      // ① フリーハンド線：描き終わったら同じツールでもう一度開始（連続手書き）
-      if (event.tool === "polyline") {
-        sketch.create("polyline");
-        return;
-      }
-    
-      // ② テキストメモ：クリック後に文字列を入力
-      if (event.tool === "point" && event.graphic && event.graphic.symbol) {
-        const g = event.graphic;
-        const currentText = g.symbol.text || "メモ";
-        const newText = prompt("表示するテキストを入力してください：", currentText);
-    
-        if (newText === null || newText.trim() === "") {
-          // キャンセル or 空文字 → グラフィックを削除
-          sketchLayer.remove(g);
-        } else {
-          g.symbol.text = newText.trim();
+      if (event.state === "complete") {
+        const tool = event.tool;
+        if (tool) {
+          sketch.create(tool);
         }
       }
     });
-
 
     const sketchExpand = new Expand({
       view: view,
@@ -765,25 +756,7 @@
     });
     view.ui.add(sketchExpand, "top-right");
 
-    // icon書き換え
-    sketchExpand.when(function () {
-      setTimeout(function () {
-        const pointBtn = sketchExpand.domNode.querySelector(
-          '.esri-skech__button[data-type="point"]'
-        );
-        if (!pointBtn) return;
-
-        const iconSpan = pointBtn.querySelector('.esri-sketch__tool-icon');
-        if (!iconSpan) return;
-
-        iconSpan.className = "esri-sketch__tool-icon esri-icon-text";
-
-        pointBtn.title = "テキストメモを追加";
-        pointBtn.setAttribute("aria-label", "テキストメモを追加");
-      }, 400);
-    });
-
-    // 展開時に自動でフリーハンド線を開始／閉じたらキャンセル
+    // 展開時は自動でフリーハンド線を開始／閉じたらキャンセル
     sketchExpand.watch("expanded", function (expanded) {
       if (expanded) {
         sketch.create("polyline");
@@ -792,22 +765,29 @@
       }
     });
 
+    // ★ テキストメモ用ウィジェット（描画ツールの下に配置）
+    const memoDiv = document.createElement("div");
+    memoDiv.style.padding = "8px";
+    memoDiv.style.fontSize = "12px";
+    memoDiv.innerHTML = "地図上をクリックするとテキストメモを追加します。<br>完了したら、このパネルを閉じてください。";
+
+    const textMemoExpand = new Expand({
+      view: view,
+      content: memoDiv,
+      expanded: false,
+      expandTooltip: "テキストメモ",
+      icon: "esri-icon-label",
+      group: "top-right-tools",
+      autoCollapse: false
+    });
+    view.ui.add(textMemoExpand, "top-right");
+
+    textMemoExpand.watch("expanded", function (expanded) {
+      textMemoModeOn = expanded;
+    });
+
     // 計測 & Print は view.when 後
     view.when(function () {
-
-      // Sketch の point ボタンのアイコンをラベル風に変更
-      setTimeout(function () {
-        const pointBtn = document.querySelector(
-          '.esri-sketch__button[data-type="point"]'
-        );
-        if (!pointBtn) return;
-
-        iconSpan.className = "esri-sketch__tool-icon esri-icon-label";
-
-        pointBtn.title = "テキストメモを追加";
-        pointBtn.setAttribute("aria-label", "テキストメモを追加");
-      }, 1200);
-      
       distanceMeasurement = new DistanceMeasurement2D({
         view: view
       });
@@ -884,10 +864,3 @@
 
 </body>
 </html>
-
-
-
-
-
-
-
