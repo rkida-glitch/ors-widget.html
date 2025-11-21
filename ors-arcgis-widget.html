@@ -391,7 +391,7 @@
         btnRouteMode.style.backgroundColor = "#005ea5";
         btnRouteMode.style.color = "#ffffff";
       } else {
-        btnRouteMode.textContent = "ルート検索: OFF";
+        btnRouteMode.textContent = "ルート検索：OFF";
         btnRouteMode.style.backgroundColor = "#ffffff";
         btnRouteMode.style.color = "#000000";
       }
@@ -608,8 +608,8 @@
       ascentEl.textContent   = ascent;
       descentEl.textContent  = descent;
     }
-
-        view.on("click", function (event) {
+   
+    view.on("click", function (event) {
 
       // ★ ルート検索モードが OFF のときは、ルート処理は一切しない
       //    （マップ本来のクリック挙動＝ポップアップ表示などだけが動く）
@@ -755,8 +755,6 @@
 
     // 距離計測 & Print ウィジェットは view が準備できてから追加
     view.when(function () {
-    // 距離計測 & Print ウィジェットは view が準備できてから追加
-    view.when(function () {
 
       // ★ polylineツールのアイコンを鉛筆マークに差し替え
       //   SketchウィジェットがDOMに描画されるのを少し待ってから実行
@@ -853,6 +851,7 @@
 
 </body>
 </html>
+
 
 
 
