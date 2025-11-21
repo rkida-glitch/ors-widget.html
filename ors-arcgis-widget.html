@@ -315,7 +315,8 @@
     "esri/widgets/LayerList",
     "esri/widgets/Expand",
     "esri/widgets/Search",
-    "esri/widgets/DistanceMeasurement2D"
+    "esri/widgets/DistanceMeasurement2D",
+    "esri/symbols/TextSymbol"
   ], function (
     WebMap,
     MapView,
@@ -328,7 +329,8 @@
     LayerList,
     Expand,
     Search,
-    DistanceMeasurement2D
+    DistanceMeasurement2D,
+    TextSymbol
   ) {
 
     const webmap = new WebMap({
@@ -700,26 +702,43 @@
     const sketch = new Sketch({
       view: view,
       layer: sketchLayer,
-      availableCreateTools: [
-        "text", 
-        "polyline", 
-        "polygon", 
-        "point"
-      ],
+      availableCreateTools: ["polyline", "polygon", "point"],
       creationMode: "update",
       defaultCreateOptions: {
         mode: "freehand"   // polyline をフリーハンドで
       }
     });
 
+    // pointを「テキストメモ用」の記号にする
+    sketch.viewModel.pointSymbol = new TextSymbol({
+      text: "メモ",
+      color: "black",
+      haloColor: "white",
+      haloSize: 2,
+      font: {
+        size: 12,
+        family: "sans-serif"
+      }
+    });
+
     // 1ストローク書き終わるたびに同じツールで続行（連続手書き）
     sketch.on("create", function (event) {
       if (event.state === "complete") {
-        const tool = event.tool;
-        if (tool) {
-          sketch.create(tool);
-        }
+        return;
       }
+
+      // point = tezt memo
+      if (event.tool === "point" && event.graphic && event.graphic.symbol) {
+        const g = event.graphic;
+        const currentText = g.symbol.text || "メモ";
+        const newText = prompt("表示するテキストを入力してください：", currentText);
+
+        if (newText === null || nexText.trim() === "") {
+          // cancel or blank text -> delete graphic
+          sketchLayer.remove(g);
+        } else {
+          g.symbol.text = newText.trim();
+        }
     });
 
     const sketchExpand = new Expand({
@@ -744,6 +763,23 @@
 
     // 計測 & Print は view.when 後
     view.when(function () {
+
+      // Sketch の point ボタンのアイコンをラベル風に変更
+      setTimeout(function () {
+        const pointBtn = document.querySelector(
+          '.esri-sketch__button[data-type="point"]'
+        );
+        if (!pointBtn) return;
+
+        const iconSpan = pointBtn.querySelector('.esri-sketch__tool-icon');
+        if (!iconSpan) return;
+
+        // 既存アイコンはそのままでも構いませんが、気になるなら classList.remove(...)してもOK
+        iconSpan.classList.add("esri-icon-label");
+        pointBtn.title = "テキストメモを追加";
+        pointBtn.setAttribute("aria-label", "テキストメモを追加");
+      }, 800);
+      
       distanceMeasurement = new DistanceMeasurement2D({
         view: view
       });
@@ -820,4 +856,5 @@
 
 </body>
 </html>
+
 
