@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
@@ -87,7 +87,7 @@
       align-items: center;
       gap: 8px;
       text-decoration: none;
-      color: inherit;  /* 文字はそのまま白色 */
+      color: inherit;
     }
     .header-link:active {
       opacity: 0.7;
@@ -270,6 +270,7 @@
         <button id="btn-walk" class="mode-button">徒歩</button>
         <button id="btn-current" class="small-button">現在地を出発地に</button>
         <button id="btn-route-mode" class="small-button">ルート検索：ON</button>
+        <button id="btn-clear-draw" class="small-button">描画クリア</button>
         <div id="stats">
           距離: <span id="distance" class="value">–</span> km ／
           時間: <span id="duration" class="value">–</span> 分 ／
@@ -292,21 +293,16 @@
   </div>
 
 <script>
-  // ★ Cloudflare Worker の ORS プロキシURL
   const ORS_PROXY_URL = "https://ors-route-proxy.r-kida-tky.workers.dev/";
-  // Web マップ ID
   const WEBMAP_ID = "a941c0ddd83d4d2994c388364ffe3558";
 
-  // ORS の profile（移動モード）
-  let currentProfile = "driving-car"; // driving-car / foot-walking
+  let currentProfile = "driving-car";
+  let routeModeOn = true;
 
-  // 免責事項モーダルを閉じる
   document.getElementById("disclaimer-button").addEventListener("click", function () {
-    const overlay = document.getElementById("disclaimer-overlay");
-    overlay.style.display = "none";
+    document.getElementById("disclaimer-overlay").style.display = "none";
   });
 
-  // ArcGIS JS API
   require([
     "esri/WebMap",
     "esri/views/MapView",
@@ -344,7 +340,6 @@
       map: webmap
     });
 
-    // ルート・スケッチレイヤ
     const routeLayer = new GraphicsLayer();
     const sketchLayer = new GraphicsLayer();
     webmap.addMany([routeLayer, sketchLayer]);
@@ -352,20 +347,18 @@
     let startGraphic = null;
     let endGraphic = null;
     let routeGraphic = null;
-
-    // 距離計測ウィジェット（DistanceMeasurement2D 用）
     let distanceMeasurement = null;
-    let routeModeOn = true;
 
     const distanceEl = document.getElementById("distance");
     const durationEl = document.getElementById("duration");
     const ascentEl   = document.getElementById("ascent");
     const descentEl  = document.getElementById("descent");
 
-    const btnCar     = document.getElementById("btn-car");
-    const btnWalk    = document.getElementById("btn-walk");
-    const btnCurrent = document.getElementById("btn-current");
+    const btnCar       = document.getElementById("btn-car");
+    const btnWalk      = document.getElementById("btn-walk");
+    const btnCurrent   = document.getElementById("btn-current");
     const btnRouteMode = document.getElementById("btn-route-mode");
+    const btnClearDraw = document.getElementById("btn-clear-draw");
 
     function setMode(mode) {
       currentProfile = mode;
@@ -384,7 +377,6 @@
     btnCar.addEventListener("click", function () { setMode("driving-car"); });
     btnWalk.addEventListener("click", function () { setMode("foot-walking"); });
 
-
     function updateRouteModeButton() {
       if (routeModeOn) {
         btnRouteMode.textContent = "ルート検索：ON";
@@ -399,18 +391,14 @@
 
     btnRouteMode.addEventListener("click", function () {
       routeModeOn = !routeModeOn;
-      // OFF にしたタイミングでルート表示をクリアしておくと親切
       if (!routeModeOn) {
         resetRoute();
       }
       updateRouteModeButton();
     });
 
-    // 初期状態の表示を反映
     updateRouteModeButton();
 
-    
-    // 標高グラフ消去
     function clearElevationChart() {
       const canvas = document.getElementById("elevationChart");
       if (!canvas) return;
@@ -441,7 +429,6 @@
       clearElevationChart();
     }
 
-    // 標高プロファイル描画（シンプル版）
     function updateElevationChart(coords) {
       const canvas = document.getElementById("elevationChart");
       if (!canvas) return;
@@ -491,7 +478,6 @@
       const yMin = minElev - pad;
       const yMax = maxElev + pad;
 
-      // ★ min / max 表示
       const elevStatsEl = document.getElementById("elevation-stats");
       if (elevStatsEl) {
         const minDisp = Math.round(minElev * 10) / 10;
@@ -500,7 +486,6 @@
           "min: " + minDisp + " m ／ max: " + maxDisp + " m";
       }
 
-      // 軸
       ctx.strokeStyle = "#666";
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -509,7 +494,6 @@
       ctx.lineTo(w - 5, h - 15);
       ctx.stroke();
 
-      // 折れ線
       ctx.strokeStyle = "rgba(0,90,160,0.9)";
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -534,9 +518,8 @@
         endGraphic.geometry
       );
 
-      // Cloudflare Worker プロキシに投げる
       const body = {
-        profile: currentProfile,   // "driving-car" or "foot-walking"
+        profile: currentProfile,
         coordinates: [
           [startGeo.x, startGeo.y],
           [endGeo.x, endGeo.y]
@@ -608,16 +591,10 @@
       ascentEl.textContent   = ascent;
       descentEl.textContent  = descent;
     }
-   
+
     view.on("click", function (event) {
+      if (!routeModeOn) return;
 
-      // ★ ルート検索モードが OFF のときは、ルート処理は一切しない
-      //    （マップ本来のクリック挙動＝ポップアップ表示などだけが動く）
-      if (!routeModeOn) {
-        return;
-      }
-
-      // 距離計測ツールが「計測中」のときはルート処理をスキップ
       if (distanceMeasurement &&
           distanceMeasurement.viewModel &&
           distanceMeasurement.viewModel.state === "measuring") {
@@ -627,7 +604,6 @@
       const point = event.mapPoint;
 
       if (!startGraphic) {
-        // 1回目クリック：リセットして出発地
         resetRoute();
         startGraphic = new Graphic({
           geometry: point,
@@ -639,9 +615,7 @@
           }
         });
         routeLayer.add(startGraphic);
-
       } else if (!endGraphic) {
-        // 2回目クリック：到着地 → ルート計算
         endGraphic = new Graphic({
           geometry: point,
           symbol: {
@@ -653,16 +627,12 @@
         });
         routeLayer.add(endGraphic);
         requestRoute();
-
       } else {
-        // 3回目クリック：リセットだけ（新しい出発地は置かない）
         resetRoute();
-        // ここで return するのがポイント
         return;
       }
     });
 
-    // 現在地ボタン
     btnCurrent.addEventListener("click", function () {
       if (!navigator.geolocation) {
         alert("このブラウザは現在地取得に対応していません。");
@@ -703,7 +673,12 @@
       );
     });
 
-    // Search ヴィジェット
+    // 描画クリアボタン：スケッチを全部消す
+    btnClearDraw.addEventListener("click", function () {
+      sketchLayer.removeAll();
+    });
+
+    // Search ウィジェット
     const searchWidget = new Search({
       view: view,
       includeDefaultSources: true,
@@ -721,27 +696,27 @@
     });
     view.ui.add(searchExpand, "top-right");
 
-    // Sketch ウィジェット（Expand で折りたたみ）
+    // Sketch ウィジェット（手書き向け設定）
     const sketch = new Sketch({
       view: view,
       layer: sketchLayer,
-      availableCreateTools: ["point", "polyline", "polygon", "rectangle", "circle", "text"],
+      availableCreateTools: ["polyline", "text", "polygon", "rectangle", "circle", "point"],
       creationMode: "update",
       defaultCreateOptions: {
-        mode: "freehand"
+        mode: "freehand"   // polyline をフリーハンドで
       }
     });
-    // ★ 連続描画モード
 
+    // 1ストローク書き終わるたびに同じツールで続行（連続手書き）
     sketch.on("create", function (event) {
       if (event.state === "complete") {
         const tool = event.tool;
         if (tool) {
-          sketch.create(tool);   // 同じツールを連続開始
+          sketch.create(tool);
         }
       }
     });
-    
+
     const sketchExpand = new Expand({
       view: view,
       content: sketch,
@@ -753,27 +728,17 @@
     });
     view.ui.add(sketchExpand, "top-right");
 
-    // 距離計測 & Print ウィジェットは view が準備できてから追加
+    // 展開時に自動でフリーハンド線を開始／閉じたらキャンセル
+    sketchExpand.watch("expanded", function (expanded) {
+      if (expanded) {
+        sketch.create("polyline");
+      } else {
+        sketch.cancel();
+      }
+    });
+
+    // 計測 & Print は view.when 後
     view.when(function () {
-
-      // ★ polylineツールのアイコンを鉛筆マークに差し替え
-      //   SketchウィジェットがDOMに描画されるのを少し待ってから実行
-      setTimeout(function () {
-        // polylineボタンを取得
-        const polyBtn = document.querySelector(
-          '.esri-sketch__button[data-type="polyline"]'
-        );
-        if (!polyBtn) return;
-
-        // 中のアイコン要素（クラス名はesri-sketch__tool-icon) を取得
-        const iconSpan = polyBtn.querySelector('.esri-sketch__tool-icon');
-        if (!iconSpan) return;
-
-        iconSpan.classList.remove("esri-icon-polyline");
-        iconSpan.classList.add("esri-icon-edit");
-      }, 1200);
-  
-      // 距離計測ウィジェット
       distanceMeasurement = new DistanceMeasurement2D({
         view: view
       });
@@ -789,10 +754,8 @@
       });
       view.ui.add(measurementExpand, "top-right");
 
-      // パネルを閉じたら計測結果を自動クリア
       measurementExpand.watch("expanded", function (expanded) {
         if (!expanded && distanceMeasurement) {
-          // DistanceMeasurement2D の結果を消す
           if (distanceMeasurement.clear) {
             distanceMeasurement.clear();
           } else if (distanceMeasurement.viewModel &&
@@ -802,8 +765,6 @@
         }
       });
 
-
-      // Print ウィジェット
       const print = new Print({
         view: view,
         templateOptions: {
@@ -824,7 +785,7 @@
       });
     });
 
-    // 凡例 & レイヤーリスト（Expand）
+    // 凡例 & レイヤーリスト
     const legend = new Legend({ view: view });
     const legendExpand = new Expand({
       view: view,
@@ -854,37 +815,3 @@
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
