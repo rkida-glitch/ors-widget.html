@@ -765,6 +765,24 @@
     });
     view.ui.add(sketchExpand, "top-right");
 
+    // icon書き換え
+    sketchExpand.when(function () {
+      setTimeout(function () {
+        const pointBtn = sketchExpand.domNode.querySelector(
+          '.esri-skech__button[data-type="point"]'
+        );
+        if (!pointBtn) return;
+
+        const iconSpan = pointBtn.querySelector('.esri-sketch__tool-icon');
+        if (!iconSpan) return;
+
+        iconSpan.className = "esri-sketch__tool-icon esri-icon-text";
+
+        pointBtn.title = "テキストメモを追加";
+        pointBtn.setAttribute("aria-label", "テキストメモを追加");
+      }, 400);
+    });
+
     // 展開時に自動でフリーハンド線を開始／閉じたらキャンセル
     sketchExpand.watch("expanded", function (expanded) {
       if (expanded) {
@@ -866,6 +884,7 @@
 
 </body>
 </html>
+
 
 
 
