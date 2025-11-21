@@ -700,7 +700,12 @@
     const sketch = new Sketch({
       view: view,
       layer: sketchLayer,
-      availableCreateTools: ["polyline", "text", "polygon", "rectangle", "circle", "point"],
+      availableCreateTools: [
+        "text", 
+        "polyline", 
+        "polygon", 
+        "point"
+      ],
       creationMode: "update",
       defaultCreateOptions: {
         mode: "freehand"   // polyline をフリーハンドで
@@ -815,3 +820,4 @@
 
 </body>
 </html>
+
