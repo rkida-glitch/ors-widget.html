@@ -784,14 +784,11 @@
         );
         if (!pointBtn) return;
 
-        const iconSpan = pointBtn.querySelector('.esri-sketch__tool-icon');
-        if (!iconSpan) return;
+        iconSpan.className = "esri-sketch__tool-icon esri-icon-label";
 
-        // 既存アイコンはそのままでも構いませんが、気になるなら classList.remove(...)してもOK
-        iconSpan.classList.add("esri-icon-label");
         pointBtn.title = "テキストメモを追加";
         pointBtn.setAttribute("aria-label", "テキストメモを追加");
-      }, 800);
+      }, 1200);
       
       distanceMeasurement = new DistanceMeasurement2D({
         view: view
@@ -869,6 +866,7 @@
 
 </body>
 </html>
+
 
 
 
