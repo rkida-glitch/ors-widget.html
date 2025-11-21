@@ -698,6 +698,9 @@
     });
     view.ui.add(searchExpand, "top-right");
 
+    
+
+    
     // Sketch ウィジェット（手書き向け設定）
     const sketch = new Sketch({
       view: view,
@@ -709,7 +712,7 @@
       }
     });
 
-    // pointを「テキストメモ用」の記号にする
+    // point を「テキストメモ用」の記号にする（初期シンボル）
     sketch.viewModel.pointSymbol = new TextSymbol({
       text: "メモ",
       color: "black",
@@ -718,28 +721,38 @@
       font: {
         size: 12,
         family: "sans-serif"
-      }
-    });
+        }
+      });
 
-    // 1ストローク書き終わるたびに同じツールで続行（連続手書き）
+    // 手書き＆テキスト入力の挙動をカスタマイズ
     sketch.on("create", function (event) {
-      if (event.state === "complete") {
+
+      // まだ描画中（"start" / "active"）のときは何もしない
+      if (event.state !== "complete") {
         return;
       }
-
-      // point = tezt memo
+    
+      // ① フリーハンド線：描き終わったら同じツールでもう一度開始（連続手書き）
+      if (event.tool === "polyline") {
+        sketch.create("polyline");
+        return;
+      }
+    
+      // ② テキストメモ：クリック後に文字列を入力
       if (event.tool === "point" && event.graphic && event.graphic.symbol) {
         const g = event.graphic;
         const currentText = g.symbol.text || "メモ";
         const newText = prompt("表示するテキストを入力してください：", currentText);
-
-        if (newText === null || nexText.trim() === "") {
-          // cancel or blank text -> delete graphic
+    
+        if (newText === null || newText.trim() === "") {
+          // キャンセル or 空文字 → グラフィックを削除
           sketchLayer.remove(g);
         } else {
           g.symbol.text = newText.trim();
         }
+      }
     });
+
 
     const sketchExpand = new Expand({
       view: view,
@@ -856,5 +869,6 @@
 
 </body>
 </html>
+
 
 
