@@ -759,16 +759,20 @@
       // ★ polylineツールのアイコンを鉛筆マークに差し替え
       //   SketchウィジェットがDOMに描画されるのを少し待ってから実行
       setTimeout(function () {
-        // data-type="polyline" のボタンの中にある、polylineアイコン要素を探す
-        const polyIcon = document.querySelector(
-          '.esri-sketch__button[data-type="polyline"] .esri-icon-polyline'
+        // polylineボタンを取得
+        const polyBtn = document.querySelector(
+          '.esri-sketch__button[data-type="polyline"]'
         );
+        if (!polyBtn) return;
 
-      if (polyIcon) {
-        polyIcon.classList.remove("esri-icon-polyline");
-        polyIcon.classList.add("esri-icon-edit");
+        // 中のアイコン要素（クラス名はesri-sketch__tool-icon) を取得
+        const iconSpan = polyBtn.querySelector('.esri-sketch__tool-icon');
+        if (!iconSpan) return;
+
+        iconSpan.classList.remove("esri-icon-polyline");
+        iconSpan.classList.add("esri-icon-edit");
       }
-    }, 500);
+    }, 1200);
   
       // 距離計測ウィジェット
       distanceMeasurement = new DistanceMeasurement2D({
@@ -851,6 +855,7 @@
 
 </body>
 </html>
+
 
 
 
