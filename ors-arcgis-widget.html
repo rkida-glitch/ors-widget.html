@@ -269,8 +269,8 @@
         <button id="btn-car" class="mode-button active">車</button>
         <button id="btn-walk" class="mode-button">徒歩</button>
         <button id="btn-current" class="small-button">現在地を出発地に</button>
-        <button id="btn-route-mode" class="small-button">ルート検索：ON</button>
         <button id="btn-clear-draw" class="small-button">描画クリア</button>
+        <button id="btn-readme" class="small-button">詳細</button>
         <div id="stats">
           距離: <span id="distance" class="value">–</span> km ／
           時間: <span id="duration" class="value">–</span> 分 ／
@@ -357,9 +357,9 @@
 
     const btnCar       = document.getElementById("btn-car");
     const btnWalk      = document.getElementById("btn-walk");
-    const btnCurrent   = document.getElementById("btn-current");
     const btnRouteMode = document.getElementById("btn-route-mode");
     const btnClearDraw = document.getElementById("btn-clear-draw");
+    const btnReadme    = document.getElementById("btn-readme");
 
     function setMode(mode) {
       currentProfile = mode;
@@ -661,50 +661,26 @@
       }
     });
 
-    btnCurrent.addEventListener("click", function () {
-      if (!navigator.geolocation) {
-        alert("このブラウザは現在地取得に対応していません。");
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        function (pos) {
-          const lat = pos.coords.latitude;
-          const lon = pos.coords.longitude;
-
-          const xy = webMercatorUtils.lngLatToXY(lon, lat);
-          const point = {
-            type: "point",
-            x: xy[0],
-            y: xy[1],
-            spatialReference: view.spatialReference
-          };
-
-          resetRoute();
-          startGraphic = new Graphic({
-            geometry: point,
-            symbol: {
-              type: "simple-marker",
-              color: "green",
-              size: 10,
-              outline: { color: "white", width: 1 }
-            }
-          });
-          routeLayer.add(startGraphic);
-
-          view.goTo({ target: point, zoom: 15 });
-        },
-        function (err) {
-          console.error(err);
-          alert("現在地を取得できませんでした。位置情報の許可設定をご確認ください。");
-        }
-      );
-    });
 
     // 描画クリアボタン：スケッチレイヤーを全部消す（手書き & テキストメモ共通）
     btnClearDraw.addEventListener("click", function () {
       sketchLayer.removeAll();
     });
+
+
+    // 描画クリアボタン：スケッチを全部消す
+    btnClearDraw.addEventListener("click", function () {
+      sketchLayer.removeAll();
+    });
+    
+    // 「詳細」ボタン：GitHub README を新しいタブで開く
+    btnReadme.addEventListener("click", function () {
+      window.open(
+        "https://github.com/rkida-glitch/ors-widget.html/tree/main#readme",
+        "_blank"
+      );
+    });
+
 
     // Search ウィジェット
     const searchWidget = new Search({
@@ -895,4 +871,5 @@
 
 </body>
 </html>
+
 
