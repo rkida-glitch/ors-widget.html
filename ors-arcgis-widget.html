@@ -268,7 +268,7 @@
         <span>移動手段:</span>
         <button id="btn-car" class="mode-button active">車</button>
         <button id="btn-walk" class="mode-button">徒歩</button>
-        <button id="btn-current" class="small-button">現在地を出発地に</button>
+        <button id="btn-route-mode" class="small-button">ルート検索：ON</button>
         <button id="btn-clear-draw" class="small-button">描画クリア</button>
         <button id="btn-readme" class="small-button">詳細</button>
         <div id="stats">
@@ -298,6 +298,7 @@
 
   let currentProfile = "driving-car";
   let routeModeOn = true;
+  let textMemoModeOn = false;   // テキストメモモード
 
   document.getElementById("disclaimer-button").addEventListener("click", function () {
     document.getElementById("disclaimer-overlay").style.display = "none";
@@ -348,7 +349,6 @@
     let endGraphic   = null;
     let routeGraphic = null;
     let distanceMeasurement = null;
-    let textMemoModeOn = false;   // ★ テキストメモモード
 
     const distanceEl = document.getElementById("distance");
     const durationEl = document.getElementById("duration");
@@ -596,7 +596,7 @@
     // クリック挙動：テキストメモ → ルート
     view.on("click", function (event) {
 
-      // ★ テキストメモモードが ON のときは、メモだけ処理して終了
+      // テキストメモモードが ON のとき
       if (textMemoModeOn) {
         const point = event.mapPoint;
         const text = prompt("表示するテキストを入力してください：", "");
@@ -620,7 +620,7 @@
         return;
       }
 
-      // ★ ここから下はルート検索モードのときだけ
+      // ここから下はルート検索モードのみ
       if (!routeModeOn) return;
 
       if (distanceMeasurement &&
@@ -661,18 +661,11 @@
       }
     });
 
-
-    // 描画クリアボタン：スケッチレイヤーを全部消す（手書き & テキストメモ共通）
+    // 描画クリアボタン：スケッチレイヤーを全部消す
     btnClearDraw.addEventListener("click", function () {
       sketchLayer.removeAll();
     });
 
-
-    // 描画クリアボタン：スケッチを全部消す
-    btnClearDraw.addEventListener("click", function () {
-      sketchLayer.removeAll();
-    });
-    
     // 「詳細」ボタン：GitHub README を新しいタブで開く
     btnReadme.addEventListener("click", function () {
       window.open(
@@ -680,7 +673,6 @@
         "_blank"
       );
     });
-
 
     // Search ウィジェット
     const searchWidget = new Search({
@@ -712,37 +704,33 @@
     });
 
     // --- Sketch 図形のデフォルトシンボル変更 ---
-    // polyline → 赤い線
     sketch.viewModel.polylineSymbol = {
       type: "simple-line",
       color: [255, 0, 0, 1],
       width: 2
     };
     
-    // polygon → 枠線赤・塗りつぶしなし
     sketch.viewModel.polygonSymbol = {
       type: "simple-fill",
-      color: [0, 0, 0, 0],         // 完全透明
+      color: [0, 0, 0, 0],
       outline: {
         color: [255, 0, 0, 1],
         width: 2
       }
     };
     
-    // point → 塗りつぶし赤・枠黒
     sketch.viewModel.pointSymbol = {
       type: "simple-marker",
       style: "circle",
-      color: [255, 0, 0, 1],       // 中を赤
+      color: [255, 0, 0, 1],
       size: 10,
       outline: {
-        color: [0, 0, 0, 1],       // 枠を黒
+        color: [0, 0, 0, 1],
         width: 1.5
       }
     };
 
-
-    // 連続描画：1ストローク完了後も同じツールを継続
+    // 連続描画
     sketch.on("create", function (event) {
       if (event.state === "complete") {
         const tool = event.tool;
@@ -763,7 +751,6 @@
     });
     view.ui.add(sketchExpand, "top-right");
 
-    // 展開時は自動でフリーハンド線を開始／閉じたらキャンセル
     sketchExpand.watch("expanded", function (expanded) {
       if (expanded) {
         sketch.create("polyline");
@@ -772,7 +759,7 @@
       }
     });
 
-    // ★ テキストメモ用ウィジェット（描画ツールの下に配置）
+    // テキストメモ用ウィジェット
     const memoDiv = document.createElement("div");
     memoDiv.style.padding = "8px";
     memoDiv.style.fontSize = "12px";
@@ -871,5 +858,3 @@
 
 </body>
 </html>
-
-
