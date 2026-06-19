@@ -10,5 +10,5 @@
 https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A33-2024.html、https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-mesh250r6.html）</p>
 <p>厚生労働省医療情報ネットのオープンデータ（https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/kenkou_iryou/iryou/newpage_43373.html）</p>
 <p介護サービス情報の公表システムデータのオープンデータ（https://www.mhlw.go.jp/stf/kaigo-kouhyou_opendata.html）</p>
-<p>国土地理院避難所等データダウンロードサイト（https://hinanmap.gsi.go.jp/hinanjocp/hinanbasho/koukaidate.html?utm_source=chatgpt.com
-）</p>
+<p>国土地理院避難所等データダウンロードサイト（https://hinanmap.gsi.go.jp/hinanjocp/hinanbasho/koukaidate.html）</p>
+<p>石川県地震被害想定調査結果（https://www.pref.ishikawa.lg.jp/bousai/jisjinhigaisoutei/higaisoutei.html）</p>
